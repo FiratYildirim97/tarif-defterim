@@ -1,0 +1,8 @@
+{
+  "name": "Tarif Defterim",
+  "description": "A comprehensive recipe management app with AI-powered suggestions, detailed cooking steps, and beautiful UI for food enthusiasts.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
