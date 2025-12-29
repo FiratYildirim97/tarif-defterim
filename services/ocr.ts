@@ -5,10 +5,8 @@ import * as pdfjsLib from 'pdfjs-dist';
 // Initialize PDF worker
 // Note: In a Vite environment, we need to handle the worker source correctly.
 // This approach uses the URL constructor which Vite supports for asset handling.
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-    'pdfjs-dist/build/pdf.worker.min.mjs',
-    import.meta.url
-).toString();
+// Use CDN for worker to avoid build/path issues on Vercel
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
 export interface ScannedRecipe {
     name: string;
