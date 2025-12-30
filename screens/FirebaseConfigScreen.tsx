@@ -2,26 +2,38 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 interface FirebaseConfigScreenProps {
-    setFirebaseConfig: (config: string) => void;
+    setFirebaseConfig?: (config: string) => void;
+    onAddConfig?: (name: string, config: string) => void;
 }
 
-const FirebaseConfigScreen: React.FC<FirebaseConfigScreenProps> = ({ setFirebaseConfig }) => {
+const FirebaseConfigScreen: React.FC<FirebaseConfigScreenProps> = ({ setFirebaseConfig, onAddConfig }) => {
     const [configInput, setConfigInput] = useState('');
+    const [bookName, setBookName] = useState('');
     const [error, setError] = useState('');
     const navigate = useNavigate();
 
     const handleSave = () => {
         try {
-            // JSON formatını doğrula
-            const parsedConfig = JSON.parse(configInput);
+            let finalConfig = '';
 
-            // Gerekli alanların basit kontrolü
-            if (!parsedConfig.apiKey || !parsedConfig.authDomain || !parsedConfig.projectId) {
-                throw new Error('Eksik konfigürasyon alanları. Lütfen geçerli bir Firebase yapılandırma nesnesi girin.');
+            // Config alanı doluysa doğrula
+            if (configInput.trim()) {
+                const parsedConfig = JSON.parse(configInput);
+                if (typeof parsedConfig !== 'object' || parsedConfig === null) {
+                    throw new Error('Yapılandırma geçerli bir JSON objesi olmalıdır.');
+                }
+                finalConfig = JSON.stringify(parsedConfig);
             }
 
-            // Konfigürasyonu kaydet
-            setFirebaseConfig(JSON.stringify(parsedConfig));
+            // İsim belirleme (Boş ise varsayılan)
+            const finalName = bookName.trim() || `İsimsiz Defter (${new Date().toLocaleDateString()})`;
+
+            // Kayıt işlemi
+            if (onAddConfig) {
+                onAddConfig(finalName, finalConfig);
+            } else if (setFirebaseConfig) {
+                setFirebaseConfig(finalConfig);
+            }
 
             // Başarılı, ana sayfaya yönlendir
             navigate('/home');
@@ -39,15 +51,29 @@ const FirebaseConfigScreen: React.FC<FirebaseConfigScreenProps> = ({ setFirebase
                 </div>
 
                 <h1 className="text-2xl font-bold text-center text-text-main dark:text-white mb-2">
-                    Firebase Yapılandırması
+                    Yeni Defter Ekle
                 </h1>
 
-                <p className="text-center text-gray-600 dark:text-gray-300 mb-6 font-medium">
-                    Uygulamayı kullanabilmek için Firebase proje ayarlarınızı JSON formatında aşağıya yapıştırın.
+                <p className="text-center text-gray-600 dark:text-gray-300 mb-6 font-medium text-sm">
+                    Yeni bir tarif defteri oluşturun. İsterseniz şimdi Firebase yapılandırmasını girerek buluta bağlayabilir, isterseniz boş bırakarak daha sonra ayarlayabilirsiniz.
                 </p>
 
                 <div className="space-y-4">
+                    <div>
+                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Defter Adı</label>
+                        <input
+                            type="text"
+                            value={bookName}
+                            onChange={(e) => setBookName(e.target.value)}
+                            placeholder="Örn: Yazlık Ev (Boş bırakılabilir)"
+                            className="w-full h-12 px-4 bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none font-bold text-text-main dark:text-white"
+                        />
+                    </div>
+
                     <div className="relative">
+                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+                            Firebase Konfigürasyonu (İsteğe Bağlı)
+                        </label>
                         <textarea
                             value={configInput}
                             onChange={(e) => {
@@ -55,10 +81,10 @@ const FirebaseConfigScreen: React.FC<FirebaseConfigScreenProps> = ({ setFirebase
                                 setError('');
                             }}
                             placeholder='{ "apiKey": "...", "authDomain": "...", ... }'
-                            className="w-full h-48 p-4 bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none resize-none font-mono text-sm text-text-main dark:text-gray-200"
+                            className="w-full h-40 p-4 bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none resize-none font-mono text-xs text-text-main dark:text-gray-200"
                         />
                         {error && (
-                            <p className="absolute -bottom-6 left-0 text-red-500 text-sm font-bold flex items-center">
+                            <p className="absolute -bottom-6 left-0 text-red-500 text-sm font-bold flex items-center animate-pulse">
                                 <span className="material-symbols-outlined text-sm mr-1">error</span>
                                 {error}
                             </p>
@@ -67,16 +93,15 @@ const FirebaseConfigScreen: React.FC<FirebaseConfigScreenProps> = ({ setFirebase
 
                     <button
                         onClick={handleSave}
-                        disabled={!configInput.trim()}
-                        className="w-full h-12 mt-4 bg-primary hover:bg-primary-dark disabled:bg-gray-300 dark:disabled:bg-white/10 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all shadow-lg shadow-primary/20 flex items-center justify-center"
+                        className="w-full h-12 mt-6 bg-primary hover:bg-primary-dark text-white font-bold rounded-xl transition-all shadow-lg shadow-primary/20 flex items-center justify-center active:scale-[0.98]"
                     >
-                        <span className="mr-2">Kaydet ve Devam Et</span>
-                        <span className="material-symbols-outlined text-xl">arrow_forward</span>
+                        <span className="mr-2">Defteri Oluştur</span>
+                        <span className="material-symbols-outlined text-xl">check</span>
                     </button>
 
                     <button
-                        onClick={() => navigate('/')}
-                        className="w-full py-3 text-gray-500 dark:text-gray-400 font-medium hover:text-text-main dark:hover:text-white transition-colors"
+                        onClick={() => navigate(-1)}
+                        className="w-full py-3 text-gray-500 dark:text-gray-400 font-medium hover:text-text-main dark:hover:text-white transition-colors text-sm"
                     >
                         Vazgeç
                     </button>
