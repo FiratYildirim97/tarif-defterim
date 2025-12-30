@@ -1,7 +1,6 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ThemeMode, Recipe } from '../types';
+import { ThemeMode, Recipe, SavedConfig } from '../types';
 
 interface SettingsProps {
   theme: ThemeMode;
@@ -12,10 +11,15 @@ interface SettingsProps {
   recipes: Recipe[];
   firebaseConfig: string;
   setFirebaseConfig: (config: string) => void;
+  savedConfigs?: SavedConfig[];
+  onSwitchConfig?: (id: string) => void;
+  onRemoveConfig?: (id: string) => void;
+  activeConfigId?: string | null;
 }
 
-const SettingsScreen: React.FC<SettingsProps> = ({ 
-  theme, setTheme, userName, setUserName, resetData, recipes, firebaseConfig, setFirebaseConfig 
+const SettingsScreen: React.FC<SettingsProps> = ({
+  theme, setTheme, userName, setUserName, resetData, recipes,
+  firebaseConfig, setFirebaseConfig, savedConfigs, onSwitchConfig, onRemoveConfig, activeConfigId
 }) => {
   const navigate = useNavigate();
   const [tempConfig, setTempConfig] = useState(firebaseConfig);
@@ -45,6 +49,7 @@ const SettingsScreen: React.FC<SettingsProps> = ({
 
   const handleExportData = async () => {
     try {
+      // @ts-ignore
       const { jsPDF } = await import('https://esm.sh/jspdf');
       const doc = new jsPDF();
       const primaryColor = [238, 140, 43];
@@ -54,12 +59,12 @@ const SettingsScreen: React.FC<SettingsProps> = ({
       doc.setFontSize(22);
       doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
       doc.text(fixTR("TARIF DEFTERIM"), 105, yPos, { align: "center" });
-      
+
       yPos += 10;
       doc.setFontSize(12);
       doc.setTextColor(100);
       doc.text(fixTR(`Sef ${userName} Tarafindan Hazirlandi`), 105, yPos, { align: "center" });
-      
+
       yPos += 20;
       doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
       doc.line(20, yPos, 190, yPos);
@@ -141,7 +146,7 @@ const SettingsScreen: React.FC<SettingsProps> = ({
       </header>
 
       <main className="max-w-7xl mx-auto px-6 py-12 flex flex-col gap-10">
-        
+
         {/* Profile Section */}
         <section className="flex flex-col gap-4">
           <h4 className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Profil</h4>
@@ -160,35 +165,94 @@ const SettingsScreen: React.FC<SettingsProps> = ({
           </div>
         </section>
 
-        {/* CLOUD SYNC SECTION - NEW */}
+        {/* MY BOOKS SECTION */}
         <section className="flex flex-col gap-4">
-          <h4 className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Bulut Paylaşımı & Senkronizasyon (Firebase)</h4>
-          <div className="overflow-hidden rounded-[2.5rem] bg-surface-light dark:bg-surface-dark shadow-sm border border-gray-50 dark:border-white/5 p-8">
-            <div className="flex flex-col gap-6">
-              <div className="flex items-center gap-4">
-                <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${firebaseConfig ? 'bg-green-500/10 text-green-500' : 'bg-primary/10 text-primary'}`}>
-                  <span className="material-symbols-outlined text-[24px]">{firebaseConfig ? 'cloud_done' : 'cloud_off'}</span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-base font-bold">Firebase Yapılandırması</span>
-                  <span className="text-xs text-gray-400">{firebaseConfig ? 'Bulut senkronizasyonu aktif.' : 'Ortak tarif defteri için Firebase config JSON yapıştırın.'}</span>
-                </div>
-              </div>
-              
+          <div className="flex items-center justify-between px-4">
+            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Defterlerim (Firebase)</h4>
+            <button
+              onClick={() => navigate('/firebase-config')}
+              className="text-xs font-bold text-primary hover:text-primary-dark transition-colors flex items-center gap-1"
+            >
+              <span className="material-symbols-outlined text-base">add_circle</span>
+              Yeni Ekle
+            </button>
+          </div>
+
+          <div className="overflow-hidden rounded-[2.5rem] bg-surface-light dark:bg-surface-dark shadow-sm border border-gray-50 dark:border-white/5 p-6 md:p-8">
+            {savedConfigs && savedConfigs.length > 0 ? (
               <div className="space-y-4">
-                <textarea 
-                  value={tempConfig}
-                  onChange={(e) => setTempConfig(e.target.value)}
-                  placeholder='{ "apiKey": "...", "projectId": "...", ... }'
-                  className="w-full h-32 rounded-2xl bg-gray-100 dark:bg-black/30 border-none p-4 font-mono text-xs focus:ring-2 focus:ring-primary/20"
-                />
-                <button 
-                  onClick={handleSaveFirebase}
-                  className="w-full h-12 rounded-xl bg-primary text-white font-black text-sm uppercase tracking-widest shadow-lg shadow-primary/20 active:scale-95 transition-all"
+                {savedConfigs.map(config => (
+                  <div
+                    key={config.id}
+                    onClick={() => {
+                      if (config.id !== activeConfigId && onSwitchConfig) {
+                        onSwitchConfig(config.id);
+                      }
+                    }}
+                    className={`relative flex items-center justify-between p-4 rounded-2xl border transition-all cursor-pointer group ${config.id === activeConfigId
+                        ? 'bg-primary/5 border-primary/20 shadow-md shadow-primary/5'
+                        : 'bg-white dark:bg-black/20 border-gray-100 dark:border-white/5 hover:border-primary/30'
+                      }`}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${config.id === activeConfigId ? 'bg-primary text-white shadow-lg shadow-primary/30' : 'bg-gray-100 dark:bg-white/5 text-gray-400'
+                        }`}>
+                        <span className="material-symbols-outlined">{config.id === activeConfigId ? 'cloud_done' : 'book_2'}</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className={`text-base font-bold ${config.id === activeConfigId ? 'text-primary' : 'text-text-main dark:text-white'}`}>
+                          {config.name}
+                        </span>
+                        <span className="text-xs text-gray-400 font-mono truncate max-w-[150px] opacity-60">
+                          {config.id === activeConfigId ? 'Aktif Defter' : 'Değiştirmek için tıkla'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {config.id !== activeConfigId && onRemoveConfig && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (window.confirm(`${config.name} adlı defteri silmek istediğinize emin misiniz?`)) {
+                            onRemoveConfig(config.id);
+                          }
+                        }}
+                        className="h-10 w-10 flex items-center justify-center rounded-xl text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all opacity-0 group-hover:opacity-100"
+                      >
+                        <span className="material-symbols-outlined">delete</span>
+                      </button>
+                    )}
+
+                    {config.id === activeConfigId && (
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                        <span className="flex h-3 w-3 relative">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 dark:bg-white/5 text-gray-400 mb-4">
+                  <span className="material-symbols-outlined text-3xl">no_accounts</span>
+                </div>
+                <p className="text-sm font-bold text-gray-500 dark:text-gray-400">Henüz kayıtlı bir defteriniz yok.</p>
+                <button
+                  onClick={() => navigate('/firebase-config')}
+                  className="mt-4 px-6 py-2 rounded-xl bg-primary/10 text-primary font-bold text-sm hover:bg-primary hover:text-white transition-all"
                 >
-                  BAĞLAN VE EŞİTLE
+                  Defter Ekle
                 </button>
               </div>
+            )}
+
+            <div className="mt-6 pt-6 border-t border-gray-100 dark:border-white/5">
+              <p className="text-[10px] text-gray-400 leading-relaxed text-center">
+                Eklediğiniz defterler arasında geçiş yaparak farklı tarif koleksiyonlarınıza erişebilirsiniz. Her defter kendi tariflerini saklar.
+              </p>
             </div>
           </div>
         </section>
@@ -238,8 +302,8 @@ const SettingsScreen: React.FC<SettingsProps> = ({
         </div>
 
         <footer className="mt-12 py-10 border-t border-gray-100 dark:border-white/5 text-center flex flex-col items-center gap-4">
-           <div className="h-14 w-14 rounded-3xl bg-primary/10 text-primary flex items-center justify-center"><span className="material-symbols-outlined text-3xl font-black">restaurant</span></div>
-           <p className="text-xs font-black text-gray-300 dark:text-gray-600 uppercase tracking-[0.4em]">TARİF DEFTERİM • V1.0.3</p>
+          <div className="h-14 w-14 rounded-3xl bg-primary/10 text-primary flex items-center justify-center"><span className="material-symbols-outlined text-3xl font-black">restaurant</span></div>
+          <p className="text-xs font-black text-gray-300 dark:text-gray-600 uppercase tracking-[0.4em]">TARİF DEFTERİM • V1.0.3</p>
         </footer>
       </main>
     </div>
