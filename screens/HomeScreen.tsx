@@ -24,8 +24,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ recipes, toggleFavorite, catego
 
   const filteredRecipes = recipes.filter(recipe => {
     const matchesCategory = selectedCategory === Category.ALL || recipe.category === selectedCategory;
-    const matchesSearch = recipe.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      recipe.subtitle.toLowerCase().includes(searchQuery.toLowerCase());
+    const title = recipe.title || '';
+    const subtitle = recipe.subtitle || '';
+    const matchesSearch = title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      subtitle.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
   });
 
