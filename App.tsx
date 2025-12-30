@@ -1,17 +1,24 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
-import WelcomeScreen from './screens/WelcomeScreen';
 import HomeScreen from './screens/HomeScreen';
 import FavoritesScreen from './screens/FavoritesScreen';
 import RecipeDetailScreen from './screens/RecipeDetailScreen';
 import AddRecipeScreen from './screens/AddRecipeScreen';
 import SettingsScreen from './screens/SettingsScreen';
-import FirebaseConfigScreen from './screens/FirebaseConfigScreen';
-import { ThemeMode, Recipe, Category, SavedConfig } from './types';
+import { ThemeMode, Recipe, Category } from './types';
 import { INITIAL_RECIPES } from './constants';
 import { initializeApp, getApp, getApps } from 'firebase/app';
 import { getFirestore, collection, onSnapshot, doc, setDoc, writeBatch } from 'firebase/firestore';
+
+// Hardcoded Firebase Configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyD9idTPYpjZApVudE9YX3gTNpIg0ZHfc2Y",
+  authDomain: "tarif-defterim-f0aae.firebaseapp.com",
+  projectId: "tarif-defterim-f0aae",
+  storageBucket: "tarif-defterim-f0aae.firebasestorage.app",
+  messagingSenderId: "285283683122",
+  appId: "1:285283683122:web:37c700aa2f44081db0a52b"
+};
 
 const App: React.FC = () => {
   const [theme, setTheme] = useState<ThemeMode>(ThemeMode.LIGHT);
@@ -21,13 +28,6 @@ const App: React.FC = () => {
   });
   const [categories, setCategories] = useState<string[]>(Object.values(Category));
   const [userName, setUserName] = useState<string>(localStorage.getItem('user_name') || 'Şef Adayı');
-  const [firebaseConfig, setFirebaseConfig] = useState<string>(localStorage.getItem('fb_config') || '');
-  const [savedConfigs, setSavedConfigs] = useState<SavedConfig[]>(() => {
-    const saved = localStorage.getItem('saved_configs');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const activeConfigId = localStorage.getItem('active_config_id');
 
   const isSyncingRef = useRef(false);
 
@@ -42,12 +42,9 @@ const App: React.FC = () => {
 
   // Firebase Initialization and Sync
   useEffect(() => {
-    if (!firebaseConfig) return;
-
     let unsubscribe: () => void;
     try {
-      const config = JSON.parse(firebaseConfig);
-      const app = getApps().length === 0 ? initializeApp(config) : getApp();
+      const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
       const db = getFirestore(app);
       const recipesCol = collection(db, 'tarif_defterim');
 
@@ -80,16 +77,15 @@ const App: React.FC = () => {
     }
 
     return () => { if (unsubscribe) unsubscribe(); };
-  }, [firebaseConfig]);
+  }, []);
 
   // Upload changes to Firebase
   useEffect(() => {
-    if (!firebaseConfig || isSyncingRef.current) return;
+    if (isSyncingRef.current) return;
 
     const syncToCloud = async () => {
       try {
-        const config = JSON.parse(firebaseConfig);
-        const app = getApps().length === 0 ? initializeApp(config) : getApp();
+        const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
         const db = getFirestore(app);
 
         // Push all current recipes to Firestore
@@ -107,7 +103,7 @@ const App: React.FC = () => {
 
     const timeout = setTimeout(syncToCloud, 2000); // Debounce sync
     return () => clearTimeout(timeout);
-  }, [recipes, firebaseConfig]);
+  }, [recipes]);
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -152,69 +148,12 @@ const App: React.FC = () => {
     }
   };
 
-  const updateFirebaseConfig = (config: string) => {
-    // Legacy support or direct update if needed
-    setFirebaseConfig(config);
-    localStorage.setItem('fb_config', config);
-  };
-
-  const addConfig = (name: string, config: string) => {
-    const newConfig: SavedConfig = {
-      id: crypto.randomUUID(),
-      name,
-      config
-    };
-
-    setSavedConfigs(prev => {
-      const newConfigs = [...prev, newConfig];
-      localStorage.setItem('saved_configs', JSON.stringify(newConfigs));
-      return newConfigs;
-    });
-
-    // Automatically switch to new config
-    switchConfig(newConfig.id);
-  };
-
-  const removeConfig = (id: string) => {
-    setSavedConfigs(prev => {
-      const newConfigs = prev.filter(c => c.id !== id);
-      localStorage.setItem('saved_configs', JSON.stringify(newConfigs));
-      return newConfigs;
-    });
-
-    if (activeConfigId === id) {
-      setFirebaseConfig('');
-      localStorage.removeItem('fb_config');
-      localStorage.removeItem('active_config_id');
-    }
-  };
-
-  const switchConfig = (id: string) => {
-    const configToSwitch = savedConfigs.find(c => c.id === id);
-    if (configToSwitch) {
-      setFirebaseConfig(configToSwitch.config);
-      localStorage.setItem('fb_config', configToSwitch.config);
-      localStorage.setItem('active_config_id', id);
-
-      // Clear recipes to avoid mixing data
-      setRecipes([]);
-      // It will re-sync from new firebase
-    }
-  };
-
   return (
     <div className="mx-auto min-h-screen relative shadow-2xl bg-background-light dark:bg-background-dark overflow-x-hidden md:max-w-4xl lg:max-w-6xl xl:max-w-screen-xl border-x border-gray-100 dark:border-stone-900">
       <HashRouter>
         <Routes>
-          <Route path="/" element={
-            <WelcomeScreen
-              savedConfigs={savedConfigs}
-              onSwitchConfig={switchConfig}
-              activeConfigId={activeConfigId}
-            />
-          } />
           <Route
-            path="/home"
+            path="/"
             element={
               <HomeScreen
                 recipes={recipes}
@@ -276,17 +215,6 @@ const App: React.FC = () => {
                 setUserName={setUserName}
                 resetData={resetData}
                 recipes={recipes}
-                firebaseConfig={firebaseConfig}
-                setFirebaseConfig={updateFirebaseConfig}
-              />
-            }
-          />
-          <Route
-            path="/firebase-config"
-            element={
-              <FirebaseConfigScreen
-                setFirebaseConfig={updateFirebaseConfig}
-                onAddConfig={addConfig}
               />
             }
           />
