@@ -12,9 +12,26 @@ const FirebaseConfigScreen: React.FC<FirebaseConfigScreenProps> = ({ setFirebase
     const [error, setError] = useState('');
     const navigate = useNavigate();
 
+    const handleConfigChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        const val = e.target.value;
+        setConfigInput(val);
+        setError('');
+
+        // Auto-detect project ID to use as name if name is empty
+        try {
+            if (val.trim().startsWith('{') && !bookName) {
+                const parsed = JSON.parse(val);
+                if (parsed.projectId) {
+                    setBookName(parsed.projectId);
+                }
+            }
+        } catch (e) { /* ignore parse errors while typing */ }
+    };
+
     const handleSave = () => {
         try {
             let finalConfig = '';
+            let detectedName = bookName.trim();
 
             // Config alanı doluysa doğrula
             if (configInput.trim()) {
@@ -23,10 +40,15 @@ const FirebaseConfigScreen: React.FC<FirebaseConfigScreenProps> = ({ setFirebase
                     throw new Error('Yapılandırma geçerli bir JSON objesi olmalıdır.');
                 }
                 finalConfig = JSON.stringify(parsedConfig);
+
+                // Eğer isim hala yoksa ve config'den projectId çıkıyorsa onu al
+                if (!detectedName && parsedConfig.projectId) {
+                    detectedName = parsedConfig.projectId;
+                }
             }
 
-            // İsim belirleme (Boş ise varsayılan)
-            const finalName = bookName.trim() || `İsimsiz Defter (${new Date().toLocaleDateString()})`;
+            // İsim belirleme (Hala boş ise varsayılan)
+            const finalName = detectedName || `İsimsiz Defter (${new Date().toLocaleDateString()})`;
 
             // Kayıt işlemi
             if (onAddConfig) {
@@ -55,7 +77,7 @@ const FirebaseConfigScreen: React.FC<FirebaseConfigScreenProps> = ({ setFirebase
                 </h1>
 
                 <p className="text-center text-gray-600 dark:text-gray-300 mb-6 font-medium text-sm">
-                    Yeni bir tarif defteri oluşturun. İsterseniz şimdi Firebase yapılandırmasını girerek buluta bağlayabilir, isterseniz boş bırakarak daha sonra ayarlayabilirsiniz.
+                    Yeni bir tarif defteri oluşturun. Firebase konfigürasyonunu yapıştırdığınızda defter adı otomatik olarak doldurulacaktır.
                 </p>
 
                 <div className="space-y-4">
@@ -76,10 +98,7 @@ const FirebaseConfigScreen: React.FC<FirebaseConfigScreenProps> = ({ setFirebase
                         </label>
                         <textarea
                             value={configInput}
-                            onChange={(e) => {
-                                setConfigInput(e.target.value);
-                                setError('');
-                            }}
+                            onChange={handleConfigChange}
                             placeholder='{ "apiKey": "...", "authDomain": "...", ... }'
                             className="w-full h-40 p-4 bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none resize-none font-mono text-xs text-text-main dark:text-gray-200"
                         />
