@@ -1,18 +1,24 @@
-
 <!DOCTYPE html>
 <html lang="tr">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="/icon.PNG">
+    <link rel="icon" type="image/png" href="/icon.PNG">
     <title>Tarif Defterim</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <!-- Material Symbols -->
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+        rel="stylesheet" />
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
     <script id="tailwind-config">
         tailwind.config = {
             darkMode: "class",
@@ -48,23 +54,37 @@
             font-family: 'Plus Jakarta Sans', sans-serif;
             background-color: #f8f7f6;
         }
+
         .dark body {
             background-color: #1b140d;
         }
+
         .no-scrollbar::-webkit-scrollbar {
             display: none;
         }
+
         .no-scrollbar {
             -ms-overflow-style: none;
             scrollbar-width: none;
         }
+
         /* Custom transitions */
-        .page-enter { opacity: 0; transform: translateY(10px); }
-        .page-enter-active { opacity: 1; transform: translateY(0); transition: all 300ms ease-out; }
+        .page-enter {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        .page-enter-active {
+            opacity: 1;
+            transform: translateY(0);
+            transition: all 300ms ease-out;
+        }
     </style>
 </head>
+
 <body class="antialiased text-text-main dark:text-white transition-colors duration-300">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
 </body>
+
 </html>
