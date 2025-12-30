@@ -164,18 +164,23 @@ const App: React.FC = () => {
       name,
       config
     };
-    const newConfigs = [...savedConfigs, newConfig];
-    setSavedConfigs(newConfigs);
-    localStorage.setItem('saved_configs', JSON.stringify(newConfigs));
+
+    setSavedConfigs(prev => {
+      const newConfigs = [...prev, newConfig];
+      localStorage.setItem('saved_configs', JSON.stringify(newConfigs));
+      return newConfigs;
+    });
 
     // Automatically switch to new config
     switchConfig(newConfig.id);
   };
 
   const removeConfig = (id: string) => {
-    const newConfigs = savedConfigs.filter(c => c.id !== id);
-    setSavedConfigs(newConfigs);
-    localStorage.setItem('saved_configs', JSON.stringify(newConfigs));
+    setSavedConfigs(prev => {
+      const newConfigs = prev.filter(c => c.id !== id);
+      localStorage.setItem('saved_configs', JSON.stringify(newConfigs));
+      return newConfigs;
+    });
 
     if (activeConfigId === id) {
       setFirebaseConfig('');
