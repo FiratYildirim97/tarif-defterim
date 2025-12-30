@@ -281,6 +281,7 @@ const App: React.FC = () => {
             element={
               <FirebaseConfigScreen
                 setFirebaseConfig={updateFirebaseConfig}
+                onAddConfig={addConfig}
               />
             }
           />
