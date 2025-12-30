@@ -8,7 +8,7 @@ import RecipeDetailScreen from './screens/RecipeDetailScreen';
 import AddRecipeScreen from './screens/AddRecipeScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import FirebaseConfigScreen from './screens/FirebaseConfigScreen';
-import { ThemeMode, Recipe, Category } from './types';
+import { ThemeMode, Recipe, Category, SavedConfig } from './types';
 import { INITIAL_RECIPES } from './constants';
 import { initializeApp, getApp, getApps } from 'firebase/app';
 import { getFirestore, collection, onSnapshot, doc, setDoc, writeBatch } from 'firebase/firestore';
@@ -22,6 +22,12 @@ const App: React.FC = () => {
   const [categories, setCategories] = useState<string[]>(Object.values(Category));
   const [userName, setUserName] = useState<string>(localStorage.getItem('user_name') || 'Şef Adayı');
   const [firebaseConfig, setFirebaseConfig] = useState<string>(localStorage.getItem('fb_config') || '');
+  const [savedConfigs, setSavedConfigs] = useState<SavedConfig[]>(() => {
+    const saved = localStorage.getItem('saved_configs');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const activeConfigId = localStorage.getItem('active_config_id');
 
   const isSyncingRef = useRef(false);
 
@@ -147,8 +153,48 @@ const App: React.FC = () => {
   };
 
   const updateFirebaseConfig = (config: string) => {
+    // Legacy support or direct update if needed
     setFirebaseConfig(config);
     localStorage.setItem('fb_config', config);
+  };
+
+  const addConfig = (name: string, config: string) => {
+    const newConfig: SavedConfig = {
+      id: crypto.randomUUID(),
+      name,
+      config
+    };
+    const newConfigs = [...savedConfigs, newConfig];
+    setSavedConfigs(newConfigs);
+    localStorage.setItem('saved_configs', JSON.stringify(newConfigs));
+
+    // Automatically switch to new config
+    switchConfig(newConfig.id);
+  };
+
+  const removeConfig = (id: string) => {
+    const newConfigs = savedConfigs.filter(c => c.id !== id);
+    setSavedConfigs(newConfigs);
+    localStorage.setItem('saved_configs', JSON.stringify(newConfigs));
+
+    if (activeConfigId === id) {
+      setFirebaseConfig('');
+      localStorage.removeItem('fb_config');
+      localStorage.removeItem('active_config_id');
+    }
+  };
+
+  const switchConfig = (id: string) => {
+    const configToSwitch = savedConfigs.find(c => c.id === id);
+    if (configToSwitch) {
+      setFirebaseConfig(configToSwitch.config);
+      localStorage.setItem('fb_config', configToSwitch.config);
+      localStorage.setItem('active_config_id', id);
+
+      // Clear recipes to avoid mixing data
+      setRecipes([]);
+      // It will re-sync from new firebase
+    }
   };
 
   return (
