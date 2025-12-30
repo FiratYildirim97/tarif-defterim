@@ -7,6 +7,7 @@ import FavoritesScreen from './screens/FavoritesScreen';
 import RecipeDetailScreen from './screens/RecipeDetailScreen';
 import AddRecipeScreen from './screens/AddRecipeScreen';
 import SettingsScreen from './screens/SettingsScreen';
+import FirebaseConfigScreen from './screens/FirebaseConfigScreen';
 import { ThemeMode, Recipe, Category } from './types';
 import { INITIAL_RECIPES } from './constants';
 import { initializeApp, getApp, getApps } from 'firebase/app';
@@ -21,7 +22,7 @@ const App: React.FC = () => {
   const [categories, setCategories] = useState<string[]>(Object.values(Category));
   const [userName, setUserName] = useState<string>(localStorage.getItem('user_name') || 'Şef Adayı');
   const [firebaseConfig, setFirebaseConfig] = useState<string>(localStorage.getItem('fb_config') || '');
-  
+
   const isSyncingRef = useRef(false);
 
   // Persistence
@@ -51,7 +52,7 @@ const App: React.FC = () => {
         snapshot.forEach((doc) => {
           remoteRecipes.push(doc.data() as Recipe);
         });
-        
+
         if (remoteRecipes.length > 0) {
           // Merge logic: prefer remote but keep local if not in remote
           setRecipes(prev => {
@@ -84,7 +85,7 @@ const App: React.FC = () => {
         const config = JSON.parse(firebaseConfig);
         const app = getApps().length === 0 ? initializeApp(config) : getApp();
         const db = getFirestore(app);
-        
+
         // Push all current recipes to Firestore
         // For performance, in a real app we'd only push changes
         const batch = writeBatch(db);
@@ -118,7 +119,7 @@ const App: React.FC = () => {
   }, [theme]);
 
   const toggleFavorite = (id: string) => {
-    setRecipes(prev => prev.map(r => 
+    setRecipes(prev => prev.map(r =>
       r.id === id ? { ...r, isFavorite: !r.isFavorite } : r
     ));
   };
@@ -155,65 +156,65 @@ const App: React.FC = () => {
       <HashRouter>
         <Routes>
           <Route path="/" element={<WelcomeScreen />} />
-          <Route 
-            path="/home" 
+          <Route
+            path="/home"
             element={
-              <HomeScreen 
-                recipes={recipes} 
-                toggleFavorite={toggleFavorite} 
-                categories={categories} 
-                onAddCategory={addCategory} 
+              <HomeScreen
+                recipes={recipes}
+                toggleFavorite={toggleFavorite}
+                categories={categories}
+                onAddCategory={addCategory}
                 userName={userName}
               />
-            } 
+            }
           />
-          <Route 
-            path="/favorites" 
+          <Route
+            path="/favorites"
             element={
-              <FavoritesScreen 
-                recipes={recipes} 
-                toggleFavorite={toggleFavorite} 
+              <FavoritesScreen
+                recipes={recipes}
+                toggleFavorite={toggleFavorite}
               />
-            } 
+            }
           />
-          <Route 
-            path="/recipe/:id" 
+          <Route
+            path="/recipe/:id"
             element={
-              <RecipeDetailScreen 
-                recipes={recipes} 
-                toggleFavorite={toggleFavorite} 
+              <RecipeDetailScreen
+                recipes={recipes}
+                toggleFavorite={toggleFavorite}
               />
-            } 
+            }
           />
-          <Route 
-            path="/add" 
+          <Route
+            path="/add"
             element={
-              <AddRecipeScreen 
-                categories={categories} 
-                onAddCategory={addCategory} 
+              <AddRecipeScreen
+                categories={categories}
+                onAddCategory={addCategory}
                 onAddRecipe={addRecipe}
                 recipes={recipes}
               />
-            } 
+            }
           />
-          <Route 
-            path="/edit/:id" 
+          <Route
+            path="/edit/:id"
             element={
-              <AddRecipeScreen 
-                categories={categories} 
-                onAddCategory={addCategory} 
+              <AddRecipeScreen
+                categories={categories}
+                onAddCategory={addCategory}
                 onAddRecipe={addRecipe}
                 onUpdateRecipe={updateRecipe}
                 recipes={recipes}
               />
-            } 
+            }
           />
-          <Route 
-            path="/settings" 
+          <Route
+            path="/settings"
             element={
-              <SettingsScreen 
-                theme={theme} 
-                setTheme={setTheme} 
+              <SettingsScreen
+                theme={theme}
+                setTheme={setTheme}
                 userName={userName}
                 setUserName={setUserName}
                 resetData={resetData}
@@ -221,7 +222,15 @@ const App: React.FC = () => {
                 firebaseConfig={firebaseConfig}
                 setFirebaseConfig={updateFirebaseConfig}
               />
-            } 
+            }
+          />
+          <Route
+            path="/firebase-config"
+            element={
+              <FirebaseConfigScreen
+                setFirebaseConfig={updateFirebaseConfig}
+              />
+            }
           />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
