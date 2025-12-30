@@ -49,7 +49,7 @@ const App: React.FC = () => {
       const config = JSON.parse(firebaseConfig);
       const app = getApps().length === 0 ? initializeApp(config) : getApp();
       const db = getFirestore(app);
-      const recipesCol = collection(db, 'recipes');
+      const recipesCol = collection(db, 'tarif_defterim');
 
       // 1. Listen for remote changes
       unsubscribe = onSnapshot(recipesCol, (snapshot) => {
@@ -96,7 +96,7 @@ const App: React.FC = () => {
         // For performance, in a real app we'd only push changes
         const batch = writeBatch(db);
         recipes.forEach(recipe => {
-          const docRef = doc(db, 'recipes', recipe.id);
+          const docRef = doc(db, 'tarif_defterim', recipe.id);
           batch.set(docRef, recipe);
         });
         await batch.commit();
