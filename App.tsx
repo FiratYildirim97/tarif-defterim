@@ -201,7 +201,13 @@ const App: React.FC = () => {
     <div className="mx-auto min-h-screen relative shadow-2xl bg-background-light dark:bg-background-dark overflow-x-hidden md:max-w-4xl lg:max-w-6xl xl:max-w-screen-xl border-x border-gray-100 dark:border-stone-900">
       <HashRouter>
         <Routes>
-          <Route path="/" element={<WelcomeScreen />} />
+          <Route path="/" element={
+            <WelcomeScreen
+              savedConfigs={savedConfigs}
+              onSwitchConfig={switchConfig}
+              activeConfigId={activeConfigId}
+            />
+          } />
           <Route
             path="/home"
             element={
