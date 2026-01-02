@@ -86,20 +86,18 @@ export const extractTextFromPDF = async (base64Data: string): Promise<string[]> 
 
 /**
  * Heuristic parser to convert raw text into a Recipe structure.
- * This is "dumb" parsing looking for keywords.
  */
 export const parseRecipeFromText = (text: string): ScannedRecipe => {
     const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
 
     let name = "Taranan Tarif";
     // Try to find a title. Usually the first line that is not a header.
+    // If the image has "PATATES TOSTU" at top, it comes as first line.
     if (lines.length > 0) {
-        // Heuristic: If first line is very short, it might be noise.
         const candidate = lines[0];
-        if (candidate.length > 3) {
+        // If it DOESN'T look like a section header
+        if (!candidate.match(/malzeme|yapılış|hazırlanış|bölüm/i)) {
             name = candidate.replace(/[^\w\sğüşıöçĞÜŞİÖÇ]/g, ' ').trim();
-        } else if (lines.length > 1) {
-            name = lines[1].replace(/[^\w\sğüşıöçĞÜŞİÖÇ]/g, ' ').trim();
         }
     }
 
