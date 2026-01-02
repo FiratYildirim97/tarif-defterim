@@ -39,7 +39,7 @@ const AddRecipeScreen: React.FC<AddRecipeScreenProps> = ({
   const [isBatchAnalyzing, setIsBatchAnalyzing] = useState(false);
   const [batchResults, setBatchResults] = useState<any[]>([]);
   const [coverImage, setCoverImage] = useState<string | null>(null);
-  const [ingredients, setIngredients] = useState<{ amount: string; name: string }[]>([{ amount: '', name: '' }]);
+  const [ingredients, setIngredients] = useState<{ amount: string; name: string; group?: string }[]>([{ amount: '', name: '', group: '' }]);
   const [steps, setSteps] = useState<Partial<Step>[]>([{ title: '', description: '', image: '' }]);
 
   useEffect(() => {
@@ -49,7 +49,7 @@ const AddRecipeScreen: React.FC<AddRecipeScreenProps> = ({
       setServings(existingRecipe.servings);
       setSelectedCategory(existingRecipe.category);
       setCoverImage(existingRecipe.image);
-      setIngredients(existingRecipe.ingredients.map(i => ({ amount: i.amount, name: i.name })));
+      setIngredients(existingRecipe.ingredients.map(i => ({ amount: i.amount, name: i.name, group: i.group || '' })));
       setSteps(existingRecipe.steps.map(s => ({ title: s.title, description: s.description, image: s.image })));
     }
   }, [isEditMode, existingRecipe]);
@@ -59,9 +59,9 @@ const AddRecipeScreen: React.FC<AddRecipeScreenProps> = ({
     return Array.from(new Set(names)).sort();
   }, []);
 
-  const addIngredient = () => setIngredients([...ingredients, { amount: '', name: '' }]);
+  const addIngredient = () => setIngredients([...ingredients, { amount: '', name: '', group: '' }]);
   const removeIngredient = (index: number) => { if (ingredients.length > 1) { const newIngs = [...ingredients]; newIngs.splice(index, 1); setIngredients(newIngs); } };
-  const updateIngredient = (index: number, field: 'amount' | 'name', val: string) => { const newIngs = [...ingredients]; newIngs[index] = { ...newIngs[index], [field]: val }; setIngredients(newIngs); };
+  const updateIngredient = (index: number, field: 'amount' | 'name' | 'group', val: string) => { const newIngs = [...ingredients]; newIngs[index] = { ...newIngs[index], [field]: val }; setIngredients(newIngs); };
 
   const addStep = () => setSteps([...steps, { title: '', description: '', image: '' }]);
   const removeStep = (index: number) => { if (steps.length > 1) { const newSteps = [...steps]; newSteps.splice(index, 1); setSteps(newSteps); } };
@@ -380,6 +380,7 @@ const AddRecipeScreen: React.FC<AddRecipeScreenProps> = ({
               <div className="flex flex-col gap-4">
                 {ingredients.map((ing, idx) => (
                   <div key={idx} className="flex gap-3 group animate-in slide-in-from-right duration-300">
+                    <input type="text" value={ing.group || ''} onChange={(e) => updateIngredient(idx, 'group', e.target.value)} className="w-24 h-12 rounded-xl border-none bg-surface-light dark:bg-stone-900 font-bold px-3 text-xs shadow-sm placeholder:text-gray-300" placeholder="Grup (Örn: Sos)" />
                     <input type="text" value={ing.amount} onChange={(e) => updateIngredient(idx, 'amount', e.target.value)} className="w-24 h-12 rounded-xl border-none bg-surface-light dark:bg-stone-900 font-bold px-3 text-sm shadow-sm" placeholder="Miktar" />
                     <input type="text" value={ing.name} list="ingredient-suggestions" onChange={(e) => updateIngredient(idx, 'name', e.target.value)} className="flex-1 h-12 rounded-xl border-none bg-surface-light dark:bg-stone-900 font-bold px-4 text-sm shadow-sm" placeholder="Malzeme Adı" />
                     <button onClick={() => removeIngredient(idx)} className="size-12 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-all"><span className="material-symbols-outlined">delete</span></button>
@@ -395,8 +396,7 @@ const AddRecipeScreen: React.FC<AddRecipeScreenProps> = ({
                 {steps.map((step, idx) => (
                   <div key={idx} className="relative flex flex-col gap-4 p-8 rounded-[2.5rem] bg-white dark:bg-stone-900 border border-gray-100 dark:border-stone-800 shadow-sm animate-in zoom-in-95 duration-500">
                     <div className="absolute -left-4 -top-4 size-12 rounded-[1.2rem] bg-primary text-white flex items-center justify-center font-black text-xl shadow-lg ring-8 ring-background-light dark:ring-background-dark">{idx + 1}</div>
-                    <div className="flex items-center gap-3">
-                      <input type="text" value={step.title} onChange={(e) => updateStep(idx, 'title', e.target.value)} className="flex-1 bg-transparent border-none text-xl font-black placeholder:text-gray-200 focus:ring-0" placeholder="Adım Başlığı (Opsiyonel)" />
+                    <div className="flex items-center gap-3 justify-end">
                       <button onClick={() => removeStep(idx)} className="text-red-300 hover:text-red-500"><span className="material-symbols-outlined">close</span></button>
                     </div>
                     <textarea value={step.description} onChange={(e) => updateStep(idx, 'description', e.target.value)} className="w-full min-h-[120px] rounded-2xl bg-gray-50 dark:bg-black/20 border-none p-5 text-base font-medium resize-none focus:ring-2 focus:ring-primary/10" placeholder="Bu adımda ne yapılacak?" />
