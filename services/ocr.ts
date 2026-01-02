@@ -152,7 +152,11 @@ export const parseRecipeFromText = (input: string | any): ScannedRecipe => {
         // Skip garbage
         if (lineText.replace(/\s/g, '').length < 3) continue;
 
-        const cleanLine = lineText.replace(/^[\s-*•·\d\.)]+/, '').trim();
+        // Fix: Don't strip leading numbers blindly. Only strip if it looks like a list index (1. or 1))
+        // Strip bullets first
+        let cleanLine = lineText.replace(/^[\s-*•·>]+/, '').trim();
+        // Strip numbering like "1." or "1)"
+        cleanLine = cleanLine.replace(/^\d+[\.\)]\s+/, '');
 
         // 1. Check for Explicit Section Headers
         if (isHeader(lineText, ingredientKeywords)) {
