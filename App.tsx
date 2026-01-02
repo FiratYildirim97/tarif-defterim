@@ -9,6 +9,7 @@ import { ThemeMode, Recipe, Category } from './types';
 import { INITIAL_RECIPES } from './constants';
 import { initializeApp, getApp, getApps } from 'firebase/app';
 import { getFirestore, collection, onSnapshot, doc, setDoc, writeBatch, deleteDoc } from 'firebase/firestore';
+import { ToastProvider } from './contexts/ToastContext';
 
 // Hardcoded Firebase Configuration
 
