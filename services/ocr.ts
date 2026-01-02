@@ -10,7 +10,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLi
 
 export interface ScannedRecipe {
     name: string;
-    ingredients: { name: string; amount: string }[];
+    ingredients: { name: string; amount: string; group?: string }[];
     steps: { description: string; title?: string }[];
     originalText: string;
     time: string;
@@ -119,7 +119,7 @@ export const parseRecipeFromText = (input: string | any): ScannedRecipe => {
         }
     }
 
-    const ingredients: { name: string; amount: string }[] = [];
+    const ingredients: { name: string; amount: string; group?: string }[] = [];
     const steps: { description: string; title?: string }[] = [];
 
     let section: 'unknown' | 'ingredients' | 'steps' = 'unknown';
@@ -141,19 +141,20 @@ export const parseRecipeFromText = (input: string | any): ScannedRecipe => {
     };
 
     let currentStepGroupTitle = "";
+    let currentIngredientGroup = "";
 
     // Accumulator for multi-line steps
     let pendingStep: { description: string, title?: string } | null = null;
     const commitPendingStep = () => {
         if (pendingStep && pendingStep.description.trim()) {
             steps.push({
-                description: pendingStep.description.trim(),
-                title: pendingStep.title || pendingStepTitleFromIndex(steps.length)
+                description: pendingStep.description.trim()
+                // title intentionally removed
             });
             pendingStep = null;
         }
     };
-    const pendingStepTitleFromIndex = (idx: number) => currentStepGroupTitle || `Adım ${idx + 1}`;
+    const pendingStepTitleFromIndex = (idx: number) => `Adım ${idx + 1}`;
 
     for (let i = 0; i < lines.length; i++) {
         const lineObj = lines[i];
@@ -202,7 +203,7 @@ export const parseRecipeFromText = (input: string | any): ScannedRecipe => {
                 (!lineText.match(/^[\d-*•]/) && lineText.length < 30 && (lineText === lineText.toUpperCase() || lineText.toLowerCase().includes('için')));
 
             if (isSubHeader) {
-                ingredients.push({ amount: '', name: cleanLine.replace(/:$/, '').trim() });
+                currentIngredientGroup = cleanLine.replace(/:$/, '').trim();
                 continue;
             }
 
@@ -265,7 +266,7 @@ export const parseRecipeFromText = (input: string | any): ScannedRecipe => {
             }
 
             if (ingName.trim()) {
-                ingredients.push({ amount: amount.trim(), name: ingName.trim() });
+                ingredients.push({ amount: amount.trim(), name: ingName.trim(), group: currentIngredientGroup });
             }
 
         } else if (section === 'steps') {
