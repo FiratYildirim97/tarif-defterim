@@ -92,9 +92,15 @@ export const parseRecipeFromText = (text: string): ScannedRecipe => {
     const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
 
     let name = "Taranan Tarif";
+    // Try to find a title. Usually the first line that is not a header.
     if (lines.length > 0) {
-        // First line is often the title in a recipe card
-        name = lines[0].replace(/[^\w\sğüşıöçĞÜŞİÖÇ]/g, ' ').trim();
+        // Heuristic: If first line is very short, it might be noise.
+        const candidate = lines[0];
+        if (candidate.length > 3) {
+            name = candidate.replace(/[^\w\sğüşıöçĞÜŞİÖÇ]/g, ' ').trim();
+        } else if (lines.length > 1) {
+            name = lines[1].replace(/[^\w\sğüşıöçĞÜŞİÖÇ]/g, ' ').trim();
+        }
     }
 
     const ingredients: { name: string; amount: string }[] = [];
@@ -102,45 +108,112 @@ export const parseRecipeFromText = (text: string): ScannedRecipe => {
 
     let section: 'unknown' | 'ingredients' | 'steps' = 'unknown';
 
-    const ingredientKeywords = ['malzeme', 'içindekiler', 'listesi'];
-    const stepKeywords = ['yapılışı', 'hazırlanışı', 'tarif', 'yapım', 'nasıl yapılır'];
+    // Enhanced Keywords
+    const ingredientKeywords = ['malzeme', 'içindekiler', 'listesi', 'gerekli', 'ihtiyaç', 'bileşenler'];
+    const stepKeywords = ['yapılışı', 'hazırlanışı', 'tarif', 'yapım', 'nasıl', 'hazırlama', 'adımlar', 'pişirme', 'uygulama', 'yöntem'];
+
+    // Helper to check if line looks like a header
+    const isHeader = (line: string, keywords: string[]) => {
+        const lower = line.toLowerCase();
+        // Remove common non-alpha characters for checking
+        const clean = lower.replace(/[^a-zğüşıöç]/g, '');
+        return keywords.some(k => clean.includes(k));
+    };
 
     for (let i = 1; i < lines.length; i++) {
         const line = lines[i];
-        const lowerLine = line.toLowerCase();
+        // Clean bullet points and excessive symbols
+        const cleanLine = line.replace(/^[\s-*•·\d\.)]+/, '').trim();
+
+        // Skip very short garbage lines
+        if (line.replace(/\s/g, '').length < 3) continue;
 
         // Check for section headers
-        if (ingredientKeywords.some(k => lowerLine.includes(k)) && lowerLine.length < 30) {
+        // We relax the length constraint a bit and check content
+        if (isHeader(line, ingredientKeywords) && line.length < 50) {
             section = 'ingredients';
             continue;
         }
-        if (stepKeywords.some(k => lowerLine.includes(k)) && lowerLine.length < 30) {
+        if (isHeader(line, stepKeywords) && line.length < 50) {
             section = 'steps';
             continue;
         }
 
         if (section === 'ingredients') {
-            // Try to split amount and name if possible, otherwise put whole line in name
-            // Heuristic: First number+unit is amount?
-            // Simple fallback: take the whole line
-            ingredients.push({ amount: '', name: line });
+            // Smart Ingredient Parsing
+            // Try to separate amount from name
+            // Regex for amount: starts with digits, fractions (1/2), or decimal (1.5) followed by space
+            const amountMatch = cleanLine.match(/^(\d+([.,]\d+)?(\/\d+)?)\s*([a-zA-ZğüşıöçĞÜŞİÖÇ]+)?/);
+
+            let amount = '';
+            let name = cleanLine;
+
+            // If found a number at start
+            if (amountMatch) {
+                // heuristics to see if the first word is a unit
+                // For now, simpler approach: leave users to edit the amount if it's complex 
+                // But we can try to guess "1 su bardağı"
+
+                // Let's just put the whole line in name for now, but if it starts with digit, put first word in amount?
+                // Actually the UI separates amount and name.
+
+                // Let's try splitting by first space
+                const parts = cleanLine.split(' ');
+                if (parts.length > 1 && parts[0].match(/\d/)) {
+                    amount = parts[0];
+                    // Check if second word is a unit like "bardak", "kaşık", "g", "kg"
+                    const unitCandidate = parts[1].toLowerCase();
+                    if (['gr', 'g', 'kg', 'ml', 'cl', 'l', 'lt', 'kaşık', 'bardak', 'fincan', 'adet', 'tane', 'kase', 'tutam', 'demet', 'dilim'].some(u => unitCandidate.includes(u))) {
+                        amount += ' ' + parts[1];
+                        name = parts.slice(2).join(' ');
+                    } else {
+                        name = parts.slice(1).join(' ');
+                    }
+                }
+            }
+
+            if (name.trim()) {
+                ingredients.push({ amount, name });
+            }
+
         } else if (section === 'steps') {
-            steps.push({ description: line });
+            // Avoid adding header-like lines to steps if they were missed
+            if (!isHeader(line, stepKeywords)) {
+                steps.push({ description: line });
+            }
         } else {
-            // If we haven't found a section yet, maybe these are still parts of title or description
-            // For safety, let's treat early lines as potential ingredients if they start with a bullet or number
-            if (line.match(/^[-*•\d]/)) {
-                ingredients.push({ amount: '', name: line });
+            // Still in unknown section. 
+            // If it starts with a bullet/dash, treat as ingredient or step based on likelihood?
+            // Usually ingredients come first.
+            // Or maybe it's part of the description/title.
+
+            // Heuristic A: If line starts with a number (1., 2.), likely a step
+            if (line.match(/^\d+\./)) {
+                steps.push({ description: line });
+                section = 'steps'; // Switch to steps implicitly
+            }
+            // Heuristic B: If line starts with bullet, likely ingredient
+            else if (line.match(/^[-*•]/)) {
+                ingredients.push({ amount: '', name: cleanLine });
+                section = 'ingredients'; // Switch to ingredients implicitly
             }
         }
     }
 
     // Fallback: If no headers found, just dump everything into steps
-    if (section === 'unknown') {
+    if (section === 'unknown' && ingredients.length === 0 && steps.length === 0) {
         steps.push({ description: text });
     }
 
-    return { name, ingredients, steps, originalText: text, time: '?? dk', servings: '?? Kişilik' };
+    return {
+        name,
+        ingredients,
+        steps,
+        originalText: text,
+        time: '?? dk',
+        servings: '?? Kişilik',
+        // Assuming we return these (interface defines them?) - The original code didn't have difficulty/calories in ScannedRecipe but they are safe to add if only used here
+    } as any;
 };
 
 // Main Service Functions (replacing the old Gemini ones)
