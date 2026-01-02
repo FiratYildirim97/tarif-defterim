@@ -395,8 +395,8 @@ const RecipeDetailScreen: React.FC<RecipeDetailProps> = ({ recipes, toggleFavori
           <h1 className="text-4xl md:text-7xl font-black tracking-tighter leading-[1.1] text-text-main dark:text-white">{recipe.title}</h1>
           <p className="text-lg text-text-secondary dark:text-gray-400 font-medium italic">"{recipe.subtitle}"</p>
           <div className="flex flex-wrap gap-4">
-            {[{ icon: 'schedule', label: recipe.time }, { icon: 'group', label: recipe.servings }, { icon: 'local_fire_department', label: recipe.calories }, { icon: 'star', label: recipe.rating, highlight: true }].map((stat, idx) => (
-              <div key={idx} className={`flex items-center gap-2.5 rounded-2xl border px-5 py-3 shadow-sm transition-all ${stat.highlight ? 'bg-primary text-white border-primary shadow-xl shadow-primary/20' : 'bg-surface-light dark:bg-white/5 border-gray-100 dark:border-white/5'}`}>
+            {[{ icon: 'schedule', label: recipe.time }, { icon: 'group', label: recipe.servings }, { icon: 'local_fire_department', label: recipe.calories }].map((stat, idx) => (
+              <div key={idx} className="flex items-center gap-2.5 rounded-2xl border px-5 py-3 shadow-sm transition-all bg-surface-light dark:bg-white/5 border-gray-100 dark:border-white/5">
                 <span className="material-symbols-outlined text-[22px]">{stat.icon}</span>
                 <span className="text-base font-black tracking-tight">{stat.label}</span>
               </div>
