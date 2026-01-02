@@ -56,19 +56,20 @@ const App: React.FC = () => {
           remoteRecipes.push(doc.data() as Recipe);
         });
 
+        // Always trust remote as the source of truth if it has data
         if (remoteRecipes.length > 0) {
-          // Merge logic: prefer remote but keep local if not in remote
-          setRecipes(prev => {
-            const merged = [...remoteRecipes];
-            prev.forEach(local => {
-              if (!merged.find(r => r.id === local.id)) {
-                // If local recipe not on cloud, we'll need to upload it later
-                merged.push(local);
-              }
-            });
-            return merged;
+          setRecipes(remoteRecipes);
+        } else if (recipes.length > 0 && recipes !== INITIAL_RECIPES) {
+          // If remote is empty but we have local data (first time setup), upload local
+          // This is a one-time migration or initialization step
+          const batch = writeBatch(db);
+          recipes.forEach(recipe => {
+            const docRef = doc(db, 'tarif_defterim', recipe.id);
+            batch.set(docRef, recipe);
           });
+          batch.commit().then(() => console.log("Initial Migration Done"));
         }
+
         isSyncingRef.current = false;
       });
 
@@ -79,17 +80,24 @@ const App: React.FC = () => {
     return () => { if (unsubscribe) unsubscribe(); };
   }, []);
 
-  // Upload changes to Firebase
+  // Upload ONLY when a recipe is added/edited locally
+  // We need to change how we sync. Instead of syncing on "recipes" state change (which triggers on download too),
+  // we should have specific functions for adding/updating that push to Firebase directly.
+
+  // However, to keep it simple with current architecture:
+  // We will trust that "recipes" state update coming from "onSnapshot" sets isSyncingRef=true
+  // So this effect will mostly match local additions.
   useEffect(() => {
     if (isSyncingRef.current) return;
+    if (recipes === INITIAL_RECIPES) return; // Don't upload default data if not modified
 
     const syncToCloud = async () => {
       try {
         const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
         const db = getFirestore(app);
 
-        // Push all current recipes to Firestore
-        // For performance, in a real app we'd only push changes
+        // This is inefficient (rewrites all docs) but safe for small data
+        // For a real app, we should only write the changed doc
         const batch = writeBatch(db);
         recipes.forEach(recipe => {
           const docRef = doc(db, 'tarif_defterim', recipe.id);
@@ -101,7 +109,7 @@ const App: React.FC = () => {
       }
     };
 
-    const timeout = setTimeout(syncToCloud, 2000); // Debounce sync
+    const timeout = setTimeout(syncToCloud, 1000);
     return () => clearTimeout(timeout);
   }, [recipes]);
 
