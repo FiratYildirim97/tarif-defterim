@@ -205,6 +205,7 @@ const App: React.FC = () => {
                 categories={categories}
                 onAddCategory={addCategory}
                 userName={userName}
+                deleteRecipe={deleteRecipe}
               />
             }
           />
