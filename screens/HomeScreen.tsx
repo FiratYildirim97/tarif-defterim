@@ -202,10 +202,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ recipes, toggleFavorite, catego
                         <span className="material-symbols-outlined text-[18px] text-primary">schedule</span>
                         <span className="text-xs font-bold text-gray-500">{recipe.time}</span>
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="material-symbols-outlined text-[18px] text-primary">star</span>
-                        <span className="text-xs font-black text-primary">{recipe.rating}</span>
-                      </div>
                     </div>
                   </div>
                 </div>
