@@ -80,38 +80,21 @@ const App: React.FC = () => {
     return () => { if (unsubscribe) unsubscribe(); };
   }, []);
 
-  // Upload ONLY when a recipe is added/edited locally
   // We need to change how we sync. Instead of syncing on "recipes" state change (which triggers on download too),
   // we should have specific functions for adding/updating that push to Firebase directly.
 
   // However, to keep it simple with current architecture:
   // We will trust that "recipes" state update coming from "onSnapshot" sets isSyncingRef=true
-  // So this effect will mostly match local additions.
+  // Upload changes to Firebase - REMOVED (Replaced with direct actions)
+
+  // Persistence
   useEffect(() => {
-    if (isSyncingRef.current) return;
-    if (recipes === INITIAL_RECIPES) return; // Don't upload default data if not modified
-
-    const syncToCloud = async () => {
-      try {
-        const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-        const db = getFirestore(app);
-
-        // This is inefficient (rewrites all docs) but safe for small data
-        // For a real app, we should only write the changed doc
-        const batch = writeBatch(db);
-        recipes.forEach(recipe => {
-          const docRef = doc(db, 'tarif_defterim', recipe.id);
-          batch.set(docRef, recipe);
-        });
-        await batch.commit();
-      } catch (err) {
-        console.debug("Cloud upload failed", err);
-      }
-    };
-
-    const timeout = setTimeout(syncToCloud, 1000);
-    return () => clearTimeout(timeout);
+    localStorage.setItem('local_recipes', JSON.stringify(recipes));
   }, [recipes]);
+
+  useEffect(() => {
+    localStorage.setItem('user_name', userName);
+  }, [userName]);
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -128,10 +111,22 @@ const App: React.FC = () => {
     }
   }, [theme]);
 
-  const toggleFavorite = (id: string) => {
-    setRecipes(prev => prev.map(r =>
-      r.id === id ? { ...r, isFavorite: !r.isFavorite } : r
-    ));
+  const toggleFavorite = async (id: string) => {
+    const recipe = recipes.find(r => r.id === id);
+    if (!recipe) return;
+    const updated = { ...recipe, isFavorite: !recipe.isFavorite };
+
+    // Optimistic
+    setRecipes(prev => prev.map(r => r.id === id ? updated : r));
+
+    // Remote
+    try {
+      const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+      const db = getFirestore(app);
+      await setDoc(doc(db, 'tarif_defterim', id), updated);
+    } catch (err) {
+      console.error("Fav Error:", err);
+    }
   };
 
   const addCategory = (name: string) => {
@@ -140,12 +135,34 @@ const App: React.FC = () => {
     }
   };
 
-  const addRecipe = (newRecipe: Recipe) => {
+  const addRecipe = async (newRecipe: Recipe) => {
+    // Optimistic
     setRecipes(prev => [newRecipe, ...prev]);
+
+    // Remote
+    try {
+      const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+      const db = getFirestore(app);
+      await setDoc(doc(db, 'tarif_defterim', newRecipe.id), newRecipe);
+    } catch (err) {
+      console.error("Add Recipe Error:", err);
+      alert("Tarif buluta kaydedilemedi, internet bağlantınızı kontrol edin.");
+    }
   };
 
-  const updateRecipe = (updatedRecipe: Recipe) => {
+  const updateRecipe = async (updatedRecipe: Recipe) => {
+    // Optimistic
     setRecipes(prev => prev.map(r => r.id === updatedRecipe.id ? updatedRecipe : r));
+
+    // Remote
+    try {
+      const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+      const db = getFirestore(app);
+      await setDoc(doc(db, 'tarif_defterim', updatedRecipe.id), updatedRecipe);
+    } catch (err) {
+      console.error("Update Recipe Error:", err);
+      alert("Değişiklikler kaydedilemedi.");
+    }
   };
 
   const resetData = () => {
