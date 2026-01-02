@@ -53,7 +53,7 @@ async function decodeAudioData(data: Uint8Array, ctx: AudioContext, sampleRate: 
   return buffer;
 }
 
-const RecipeDetailScreen: React.FC<RecipeDetailProps> = ({ recipes, toggleFavorite }) => {
+const RecipeDetailScreen: React.FC<RecipeDetailProps> = ({ recipes, toggleFavorite, deleteRecipe }) => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
@@ -370,6 +370,17 @@ const RecipeDetailScreen: React.FC<RecipeDetailProps> = ({ recipes, toggleFavori
         <div className="absolute top-0 left-0 w-full z-20 flex items-center justify-between px-6 pt-12 pb-4">
           <button onClick={() => navigate(-1)} className="flex size-12 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-xl text-white border border-white/20 hover:bg-white/40 transition-all"><span className="material-symbols-outlined">arrow_back</span></button>
           <div className="flex gap-3">
+            {deleteRecipe && (
+              <button
+                onClick={() => {
+                  deleteRecipe(recipe.id);
+                  navigate('/');
+                }}
+                className="flex size-12 items-center justify-center rounded-2xl bg-red-500/20 backdrop-blur-xl text-white border border-red-500/30 hover:bg-red-500 hover:text-white transition-all"
+              >
+                <span className="material-symbols-outlined">delete</span>
+              </button>
+            )}
             <button onClick={() => navigate(`/edit/${recipe.id}`)} className="flex size-12 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-xl text-white border border-white/20 hover:bg-white/40 transition-all"><span className="material-symbols-outlined">edit</span></button>
             <button onClick={() => toggleFavorite(recipe.id)} className={`flex size-12 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-xl border border-white/20 transition-all ${recipe.isFavorite ? 'text-red-500 bg-white' : 'text-white'}`}><span className="material-symbols-outlined" style={{ fontVariationSettings: recipe.isFavorite ? "'FILL' 1" : "'FILL' 0" }}>favorite</span></button>
             <button onClick={handleShare} className="flex size-12 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-xl text-white border border-white/20 hover:bg-white/40 transition-all"><span className="material-symbols-outlined">share</span></button>
