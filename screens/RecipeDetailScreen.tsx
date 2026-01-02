@@ -2,6 +2,7 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Recipe } from '../types';
+import { useToast } from '../contexts/ToastContext';
 
 
 interface RecipeDetailProps {
@@ -60,6 +61,9 @@ const RecipeDetailScreen: React.FC<RecipeDetailProps> = ({ recipes, toggleFavori
   const [isCookingMode, setIsCookingMode] = useState(false);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [isVoiceActive, setIsVoiceActive] = useState(false);
+  const [servingMultiplier, setServingMultiplier] = useState(1);
+  const { showToast } = useToast();
+  const [activeTimers, setActiveTimers] = useState<Record<string, number>>({}); // stepId -> remainingSeconds
 
   const converterRef = useRef<HTMLDivElement>(null);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
@@ -280,8 +284,62 @@ const RecipeDetailScreen: React.FC<RecipeDetailProps> = ({ recipes, toggleFavori
     } catch (err) {
       const fullContent = `${shareText}${isValidUrl ? `\n\nLink: ${shareUrl}` : ''}`;
       await navigator.clipboard.writeText(fullContent);
-      alert('Panoya kopyalandı!');
+      showToast('Panoya kopyalandı!', 'success');
     }
+  };
+
+  const getScaledAmount = (amountStr: string) => {
+    if (servingMultiplier === 1) return amountStr;
+    // Simple regex to find the first number and multiply it
+    return amountStr.replace(/(\d+[\.,]?\d*)/, (match) => {
+      const val = parseFloat(match.replace(',', '.'));
+      const scaled = val * servingMultiplier;
+      return Number.isInteger(scaled) ? scaled.toString() : scaled.toFixed(1).replace('.', ',');
+    });
+  };
+
+  const extractDuration = (text: string): number | null => {
+    const match = text.match(/\b(\d+)\s*(dk|dakika|saat)\b/i);
+    if (match) {
+      const val = parseInt(match[1]);
+      const unit = match[2].toLowerCase();
+      if (unit.startsWith('sa')) return val * 60 * 60;
+      return val * 60;
+    }
+    return null;
+  };
+
+  const toggleTimer = (stepId: string, duration: number) => {
+    if (activeTimers[stepId]) {
+      // Stop timer
+      const newTimers = { ...activeTimers };
+      delete newTimers[stepId];
+      setActiveTimers(newTimers);
+    } else {
+      // Start timer
+      setActiveTimers(prev => ({ ...prev, [stepId]: duration }));
+      const interval = setInterval(() => {
+        setActiveTimers(prev => {
+          if (!prev[stepId]) { clearInterval(interval); return prev; }
+          const rem = prev[stepId] - 1;
+          if (rem <= 0) {
+            clearInterval(interval);
+            const newT = { ...prev };
+            delete newT[stepId];
+            new Audio('https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg').play();
+            showToast('Süre doldu!', 'success');
+            return newT;
+          }
+          return { ...prev, [stepId]: rem };
+        });
+      }, 1000);
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
   const handleIngredientQuickConvert = (amountStr: string) => {
@@ -395,12 +453,21 @@ const RecipeDetailScreen: React.FC<RecipeDetailProps> = ({ recipes, toggleFavori
           <h1 className="text-4xl md:text-7xl font-black tracking-tighter leading-[1.1] text-text-main dark:text-white">{recipe.title}</h1>
           <p className="text-lg text-text-secondary dark:text-gray-400 font-medium italic">"{recipe.subtitle}"</p>
           <div className="flex flex-wrap gap-4">
-            {[{ icon: 'schedule', label: recipe.time }, { icon: 'group', label: recipe.servings }, { icon: 'local_fire_department', label: recipe.calories }].map((stat, idx) => (
+            {[{ icon: 'schedule', label: recipe.time }, { icon: 'local_fire_department', label: recipe.calories }].map((stat, idx) => (
               <div key={idx} className="flex items-center gap-2.5 rounded-2xl border px-5 py-3 shadow-sm transition-all bg-surface-light dark:bg-white/5 border-gray-100 dark:border-white/5">
                 <span className="material-symbols-outlined text-[22px]">{stat.icon}</span>
                 <span className="text-base font-black tracking-tight">{stat.label}</span>
               </div>
             ))}
+            {/* PORTION SCALER */}
+            <div className="flex items-center gap-2.5 rounded-2xl border px-4 py-2 border-primary/20 bg-primary/5">
+              <span className="material-symbols-outlined text-[22px] text-primary">group</span>
+              <div className="flex items-center gap-3">
+                <button onClick={() => setServingMultiplier(p => Math.max(0.5, p - 0.5))} className="size-6 flex items-center justify-center rounded-full bg-white text-primary font-black hover:bg-primary hover:text-white transition-colors">-</button>
+                <span className="text-base font-black tracking-tight min-w-[3ch] text-center">{(parseInt(recipe.servings || '1') * servingMultiplier).toFixed(0)}</span>
+                <button onClick={() => setServingMultiplier(p => p + 0.5)} className="size-6 flex items-center justify-center rounded-full bg-white text-primary font-black hover:bg-primary hover:text-white transition-colors">+</button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -432,7 +499,9 @@ const RecipeDetailScreen: React.FC<RecipeDetailProps> = ({ recipes, toggleFavori
                 return (
                   <li key={ing.id} onClick={() => toggleIngredient(ing.id)} className={`group flex items-center gap-4 p-5 rounded-[2rem] border transition-all cursor-pointer ${isChecked ? 'bg-primary/5 border-primary/20' : 'bg-surface-light dark:bg-surface-dark border-gray-50 dark:border-white/5 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5'}`}>
                     <div className={`size-8 rounded-full border-2 flex items-center justify-center transition-all ${isChecked ? 'bg-primary border-primary text-white' : 'border-gray-300 text-transparent'}`}><span className="material-symbols-outlined text-sm font-black">check</span></div>
-                    <span className={`flex-1 font-bold text-lg ${isChecked ? 'text-gray-400 line-through' : ''}`}>{ing.amount} {ing.name}</span>
+                    <span className={`flex-1 font-bold text-lg ${isChecked ? 'text-gray-400 line-through' : ''}`}>
+                      <span className="text-primary">{getScaledAmount(ing.amount)}</span> {ing.name}
+                    </span>
                     <button onClick={(e) => { e.stopPropagation(); handleIngredientQuickConvert(ing.amount); }} className="size-10 bg-primary/10 text-primary rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-primary hover:text-white transition-all"><span className="material-symbols-outlined text-[20px]">straighten</span></button>
                   </li>
                 );
@@ -451,6 +520,18 @@ const RecipeDetailScreen: React.FC<RecipeDetailProps> = ({ recipes, toggleFavori
                   <div className="space-y-4">
                     <h3 className="text-2xl font-black text-text-main dark:text-white">{step.title}</h3>
                     <p className="text-lg text-gray-600 dark:text-gray-300 leading-relaxed font-medium">{step.description}</p>
+                    {/* SMART TIMER DETECTOR */}
+                    {extractDuration(step.description) && (
+                      <div className="mt-2">
+                        <button
+                          onClick={() => toggleTimer(step.id || index.toString(), extractDuration(step.description)!)}
+                          className={`flex items-center gap-3 px-6 py-3 rounded-2xl font-black transition-all ${activeTimers[step.id || index.toString()] ? 'bg-red-500 text-white animate-pulse' : 'bg-primary/10 text-primary hover:bg-primary hover:text-white'}`}
+                        >
+                          <span className="material-symbols-outlined">{activeTimers[step.id || index.toString()] ? 'timer_off' : 'timer'}</span>
+                          {activeTimers[step.id || index.toString()] ? formatTime(activeTimers[step.id || index.toString()]) : 'Zamanlayıcı Başlat'}
+                        </button>
+                      </div>
+                    )}
                     {step.image && <img src={step.image} className="w-full h-72 object-cover rounded-[2.5rem] mt-6 shadow-inner ring-1 ring-black/5" />}
                   </div>
                 </div>
