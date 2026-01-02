@@ -3,12 +3,13 @@ export interface Ingredient {
   id: string;
   name: string;
   amount: string;
+  group?: string;
   checked?: boolean;
 }
 
 export interface Step {
   id: string;
-  title: string;
+  title?: string;
   description: string;
   image?: string;
 }
