@@ -132,7 +132,7 @@ export const parseRecipeFromText = (input: string | any): ScannedRecipe => {
 
     // Keywords
     const ingredientKeywords = ['malzeme', 'icindekiler', 'listesi', 'gerekli', 'ihtiyac', 'bilesenler'];
-    const stepKeywords = ['yapilisi', 'hazirlanisi', 'tarif', 'yapim', 'nasil', 'hazirlama', 'adimlar', 'pisirme', 'uygulama', 'yontem'];
+    const stepKeywords = ['yapilisi', 'hazirlanisi', 'tarif', 'yapim', 'nasil', 'hazirlama', 'adimlar', 'pisirme', 'uygulama'];
 
     const isHeader = (line: string, keywords: string[]) => {
         const clean = normalize(line);
@@ -168,7 +168,7 @@ export const parseRecipeFromText = (input: string | any): ScannedRecipe => {
         if (section === 'ingredients') {
             if (lineText.match(/^\d+[\.\)]\s+/) && lineText.length > 20) {
                 section = 'steps';
-                // fall through to process this line as a step
+                // Don't continue, simpler to let step logic handle it or just switch
             }
         }
 
@@ -191,15 +191,16 @@ export const parseRecipeFromText = (input: string | any): ScannedRecipe => {
             let boldDetected = false;
 
             if (lineObj.words && lineObj.words.length > 0) {
-                // Check if we have mixed bold/regular
-                // Note: font_properties might be null or properties might be missing depending on Tesseract version/model
+                // Expanded bold check: check both 'is_bold' and 'bold' properties, sometimes confidence matters but keeping simple
+                const isBold = (w: any) => {
+                    const fp = w.font_properties;
+                    return fp && (fp.is_bold || fp.bold || (fp.font_weight && fp.font_weight > 600));
+                };
 
-                // We look for words that are explicitly BOLD
-                const boldWords = lineObj.words.filter((w: any) => w.font_properties && w.font_properties.is_bold);
-                const regularWords = lineObj.words.filter((w: any) => !w.font_properties || !w.font_properties.is_bold);
+                const boldWords = lineObj.words.filter((w: any) => isBold(w));
+                const regularWords = lineObj.words.filter((w: any) => !isBold(w));
 
-                // Heuristic: If we have BOTH bold and regular words, assume semantic difference
-                // User request: "Bold -> Name, Regular -> Amount"
+                // User logic: "Kalın olan name, kalın olmayan amount"
                 if (boldWords.length > 0 && regularWords.length > 0) {
                     amount = regularWords.map((w: any) => w.text).join(' ');
                     ingName = boldWords.map((w: any) => w.text).join(' ');
@@ -211,26 +212,40 @@ export const parseRecipeFromText = (input: string | any): ScannedRecipe => {
             if (!boldDetected) {
                 const parts = cleanLine.split(' ');
 
-                if (parts.length > 1 && parts[0].match(/^\d/)) {
-                    const maybeUnit = normalize(parts[1]);
-                    const units = ['gr', 'g', 'kg', 'ml', 'cl', 'l', 'lt', 'kasik', 'bardak', 'fincan', 'adet', 'tane', 'kase', 'tutam', 'demet', 'dilim', 'paket', 'cay', 'su', 'yemek', 'tatli'];
+                // Enhanced Fallback Logic
+                // Known modifiers that should stick to "Amount" part
+                const modifiers = ['orta', 'boy', 'büyük', 'küçük', 'yarım', 'çeyrek', 'tam', 'bir', 'iki', 'üç', 'dört', 'beş', 'altı', 'yedi', 'sekiz', 'dokuz', 'on'];
+                const units = ['gr', 'g', 'kg', 'ml', 'cl', 'l', 'lt', 'kaşık', 'bardak', 'fincan', 'adet', 'tane', 'kase', 'tutam', 'demet', 'dilim', 'paket', 'çay', 'su', 'yemek', 'tatlı', 'kutu', 'kavanoz', 'diş'];
+                const prepMethods = ['rende', 'doğranmış', 'kıyılmış', 'ezilmiş', 'haşlanmış', 'rendelenmiş', 'soyulmuş', 'eritilmiş', 'kızarmış'];
 
-                    if (units.some(u => maybeUnit.includes(u))) {
-                        if (['su', 'cay', 'yemek', 'tatli'].some(p => maybeUnit.includes(p)) && parts.length > 2) {
-                            amount = parts.slice(0, 3).join(' ');
-                            ingName = parts.slice(3).join(' ');
-                        } else {
-                            amount = parts.slice(0, 2).join(' ');
-                            ingName = parts.slice(2).join(' ');
+                // Strategy: Consume words from start as long as they match Number, Unit, Modifier, or Prep
+                let cutoffIndex = 0;
+
+                // Special start check: is first word number or prep?
+                if (parts.length > 0) {
+                    const first = normalize(parts[0]);
+                    // Check if starts with digit OR is a prep method (e.g. "Rende Kaşar")
+                    if (parts[0].match(/^\d/) || prepMethods.some(p => first.includes(p)) || modifiers.some(m => first === m)) {
+                        cutoffIndex = 1;
+
+                        // Look ahead for more amount parts
+                        for (let i = 1; i < parts.length; i++) {
+                            const p = normalize(parts[i]);
+                            if (units.some(u => p.includes(u)) || modifiers.some(m => p === m) || prepMethods.some(pm => p.includes(pm)) || parts[i].match(/^\d/)) {
+                                cutoffIndex = i + 1;
+                            } else {
+                                // Stop at first unknown word (should be name)
+                                break;
+                            }
                         }
-                    } else {
-                        amount = parts[0];
-                        ingName = parts.slice(1).join(' ');
                     }
+                }
+
+                if (cutoffIndex > 0) {
+                    amount = parts.slice(0, cutoffIndex).join(' ');
+                    ingName = parts.slice(cutoffIndex).join(' ');
                 } else {
-                    // No number at start?
-                    // Maybe "Rende Kaşar" -> Rende is amount/prep?
-                    // Without bold info, harder to guess. Assume all name.
+                    // Default entire line to name if no structure found
                     amount = '';
                     ingName = cleanLine;
                 }
