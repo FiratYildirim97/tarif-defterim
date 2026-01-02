@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Category, Step, Recipe, Ingredient } from '../types';
@@ -73,15 +72,15 @@ const AddRecipeScreen: React.FC<AddRecipeScreenProps> = ({
     if (name && name.trim()) { onAddCategory(name.trim()); setSelectedCategory(name.trim()); }
   };
 
-  // Utility to compress images
+  // Utility to compress images (Optimized for Firestore 1MB Limit)
   const compressImage = async (base64Str: string): Promise<string> => {
     return new Promise((resolve) => {
       const img = new Image();
       img.src = base64Str;
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 1024;
-        const MAX_HEIGHT = 1024;
+        const MAX_WIDTH = 800; // Reduced to 800px to be safe
+        const MAX_HEIGHT = 800;
         let width = img.width;
         let height = img.height;
 
@@ -100,7 +99,7 @@ const AddRecipeScreen: React.FC<AddRecipeScreenProps> = ({
         canvas.height = height;
         const ctx = canvas.getContext('2d');
         ctx?.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', 0.7)); // Moderate compression
+        resolve(canvas.toDataURL('image/jpeg', 0.6)); // Aggressive compression (0.6)
       };
     });
   };
@@ -117,22 +116,27 @@ const AddRecipeScreen: React.FC<AddRecipeScreenProps> = ({
     reader.readAsDataURL(file);
   };
 
+  const removeCoverImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCoverImage(null);
+    if (coverInputRef.current) coverInputRef.current.value = '';
+  };
+
   const handleAIScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onloadend = async () => {
-      // 1. Get raw base64 for OCR (OCR might prefer high res, but limits apply)
       const rawBase64 = reader.result as string;
-      const rawData = rawBase64.split(',')[1];
+      const rawDataForOCR = rawBase64.split(',')[1];
 
-      // 2. Compress for UI/Storage
+      // Compress for UI/Storage
       const compressed = await compressImage(rawBase64);
       if (!coverImage) setCoverImage(compressed);
 
       setIsAnalyzing(true);
       try {
-        const result = await analyzeRecipeImage(rawData);
+        const result = await analyzeRecipeImage(rawDataForOCR);
         if (result) {
           setName(result.name || ''); setTime(result.time || ''); setServings(result.servings || '');
           if (result.ingredients?.length > 0) setIngredients(result.ingredients);
@@ -143,7 +147,6 @@ const AddRecipeScreen: React.FC<AddRecipeScreenProps> = ({
     reader.readAsDataURL(file);
   };
 
-  // Fix: Cast files to File[] to resolve 'unknown' type errors for file access
   const handleBatchScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []) as File[];
     if (files.length === 0) return;
@@ -288,10 +291,30 @@ const AddRecipeScreen: React.FC<AddRecipeScreenProps> = ({
             )}
 
             <section className="space-y-6">
-              <h3 className="text-lg font-black text-text-main dark:text-white uppercase tracking-widest px-2">Kapak Fotoğrafı</h3>
+              <div className="flex items-center justify-between px-2">
+                <h3 className="text-lg font-black text-text-main dark:text-white uppercase tracking-widest">Kapak Fotoğrafı</h3>
+                {coverImage && (
+                  <button onClick={removeCoverImage} className="text-xs font-bold text-red-500 hover:underline">FOTOĞRAFI KALDIR</button>
+                )}
+              </div>
               <input type="file" accept="image/*" className="hidden" ref={coverInputRef} onChange={handleCoverUpload} />
               <div onClick={() => coverInputRef.current?.click()} className="relative aspect-video w-full rounded-[2.5rem] border-4 border-dashed border-gray-100 dark:border-stone-800 bg-surface-light dark:bg-stone-900/50 overflow-hidden flex flex-col items-center justify-center hover:border-primary/50 transition-all cursor-pointer group shadow-sm">
-                {coverImage ? <img src={coverImage} className="w-full h-full object-cover transition-transform group-hover:scale-110" /> : <><span className="material-symbols-outlined text-5xl text-gray-200 mb-2">add_photo_alternate</span><p className="font-bold text-gray-400">Görsel Seç</p></>}
+                {coverImage ? (
+                  <>
+                    <img src={coverImage} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <div className="bg-white/20 backdrop-blur-md text-white px-4 py-2 rounded-xl font-bold flex items-center gap-2">
+                        <span className="material-symbols-outlined">edit</span>
+                        Değiştir
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-5xl text-gray-200 mb-2">add_photo_alternate</span>
+                    <p className="font-bold text-gray-400">Görsel Seç</p>
+                  </>
+                )}
               </div>
             </section>
 
