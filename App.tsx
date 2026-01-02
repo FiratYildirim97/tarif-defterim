@@ -10,21 +10,7 @@ import { INITIAL_RECIPES } from './constants';
 import { initializeApp, getApp, getApps } from 'firebase/app';
 import { getFirestore, collection, onSnapshot, doc, setDoc, writeBatch, deleteDoc } from 'firebase/firestore';
 
-// ... (code omitted)
-
-<Route
-  path="/settings"
-  element={
-    <SettingsScreen
-      theme={theme}
-      setTheme={setTheme}
-      userName={userName}
-      setUserName={setUserName}
-      resetData={resetData}
-      recipes={recipes}
-    />
-  }
-/>
+// Hardcoded Firebase Configuration
 
 // Hardcoded Firebase Configuration
 const firebaseConfig = {
