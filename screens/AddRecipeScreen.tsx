@@ -73,11 +73,47 @@ const AddRecipeScreen: React.FC<AddRecipeScreenProps> = ({
     if (name && name.trim()) { onAddCategory(name.trim()); setSelectedCategory(name.trim()); }
   };
 
+  // Utility to compress images
+  const compressImage = async (base64Str: string): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.src = base64Str;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 1024;
+        const MAX_HEIGHT = 1024;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.7)); // Moderate compression
+      };
+    });
+  };
+
   const handleCoverUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onloadend = () => setCoverImage(reader.result as string);
+    reader.onloadend = async () => {
+      const rawBase64 = reader.result as string;
+      const compressed = await compressImage(rawBase64);
+      setCoverImage(compressed);
+    };
     reader.readAsDataURL(file);
   };
 
@@ -86,11 +122,17 @@ const AddRecipeScreen: React.FC<AddRecipeScreenProps> = ({
     if (!file) return;
     const reader = new FileReader();
     reader.onloadend = async () => {
-      const base64 = (reader.result as string).split(',')[1];
-      if (!coverImage) setCoverImage(reader.result as string);
+      // 1. Get raw base64 for OCR (OCR might prefer high res, but limits apply)
+      const rawBase64 = reader.result as string;
+      const rawData = rawBase64.split(',')[1];
+
+      // 2. Compress for UI/Storage
+      const compressed = await compressImage(rawBase64);
+      if (!coverImage) setCoverImage(compressed);
+
       setIsAnalyzing(true);
       try {
-        const result = await analyzeRecipeImage(base64);
+        const result = await analyzeRecipeImage(rawData);
         if (result) {
           setName(result.name || ''); setTime(result.time || ''); setServings(result.servings || '');
           if (result.ingredients?.length > 0) setIngredients(result.ingredients);
