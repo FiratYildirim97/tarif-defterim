@@ -79,7 +79,7 @@ const AddRecipeScreen: React.FC<AddRecipeScreenProps> = ({
       img.src = base64Str;
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 800; // Reduced to 800px to be safe
+        const MAX_WIDTH = 800;
         const MAX_HEIGHT = 800;
         let width = img.width;
         let height = img.height;
@@ -99,7 +99,7 @@ const AddRecipeScreen: React.FC<AddRecipeScreenProps> = ({
         canvas.height = height;
         const ctx = canvas.getContext('2d');
         ctx?.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', 0.6)); // Aggressive compression (0.6)
+        resolve(canvas.toDataURL('image/jpeg', 0.6)); // Aggressive compression for Firestore
       };
     });
   };
@@ -130,7 +130,6 @@ const AddRecipeScreen: React.FC<AddRecipeScreenProps> = ({
       const rawBase64 = reader.result as string;
       const rawDataForOCR = rawBase64.split(',')[1];
 
-      // Compress for UI/Storage
       const compressed = await compressImage(rawBase64);
       if (!coverImage) setCoverImage(compressed);
 
@@ -140,7 +139,13 @@ const AddRecipeScreen: React.FC<AddRecipeScreenProps> = ({
         if (result) {
           setName(result.name || ''); setTime(result.time || ''); setServings(result.servings || '');
           if (result.ingredients?.length > 0) setIngredients(result.ingredients);
-          if (result.steps?.length > 0) setSteps(result.steps);
+          if (result.steps?.length > 0) {
+            setSteps(result.steps.map(s => ({
+              title: s.title || '',
+              description: s.description || '',
+              image: ''
+            })));
+          }
         }
       } catch (err) { alert("Tarif analiz edilemedi."); } finally { setIsAnalyzing(false); }
     };
@@ -197,7 +202,8 @@ const AddRecipeScreen: React.FC<AddRecipeScreenProps> = ({
         steps: (res.steps || []).map((step: any, i: number) => ({
           id: `s-${Date.now()}-${i}`,
           title: `Adım ${i + 1}`,
-          description: step.description
+          description: step.description,
+          image: '' // Ensure no undefined here
         }))
       };
       onAddRecipe(newRecipe);
@@ -206,8 +212,29 @@ const AddRecipeScreen: React.FC<AddRecipeScreenProps> = ({
     navigate('/home');
   };
 
+  // Helper to ensure no undefined values reach Firestore
+  const sanitizeRecipeData = (data: Recipe): Recipe => {
+    return {
+      ...data,
+      title: data.title || 'Adsız Tarif',
+      time: data.time || '0 dk',
+      servings: data.servings || '1 Kişilik',
+      ingredients: data.ingredients.map(i => ({
+        id: i.id,
+        name: i.name || '',
+        amount: i.amount || ''
+      })),
+      steps: data.steps.map(s => ({
+        id: s.id,
+        title: s.title || '',
+        description: s.description || '',
+        image: s.image || ''
+      }))
+    };
+  };
+
   const handleSave = () => {
-    const recipeData: Recipe = {
+    const rawRecipeData: Recipe = {
       id: isEditMode && existingRecipe ? existingRecipe.id : Date.now().toString(),
       title: name || 'Adsız Tarif',
       subtitle: `${selectedCategory} kategorisinde ${isEditMode ? 'güncellenmiş' : 'yeni'} bir tarif`,
@@ -222,6 +249,9 @@ const AddRecipeScreen: React.FC<AddRecipeScreenProps> = ({
       ingredients: ingredients.filter(ing => ing.name.trim() !== '').map((ing, idx) => ({ id: `i-${Date.now()}-${idx}`, name: ing.name, amount: ing.amount })),
       steps: steps.filter(step => step.description?.trim() !== '').map((step, idx) => ({ id: `s-${Date.now()}-${idx}`, title: step.title || `Adım ${idx + 1}`, description: step.description || '', image: step.image }))
     };
+
+    const recipeData = sanitizeRecipeData(rawRecipeData);
+
     if (isEditMode && onUpdateRecipe) onUpdateRecipe(recipeData); else onAddRecipe(recipeData);
     navigate(isEditMode ? `/recipe/${recipeData.id}` : '/home');
   };
