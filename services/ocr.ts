@@ -142,6 +142,19 @@ export const parseRecipeFromText = (input: string | any): ScannedRecipe => {
 
     let currentStepGroupTitle = "";
 
+    // Accumulator for multi-line steps
+    let pendingStep: { description: string, title?: string } | null = null;
+    const commitPendingStep = () => {
+        if (pendingStep && pendingStep.description.trim()) {
+            steps.push({
+                description: pendingStep.description.trim(),
+                title: pendingStep.title || pendingStepTitleFromIndex(steps.length)
+            });
+            pendingStep = null;
+        }
+    };
+    const pendingStepTitleFromIndex = (idx: number) => currentStepGroupTitle || `Adım ${idx + 1}`;
+
     for (let i = 0; i < lines.length; i++) {
         const lineObj = lines[i];
         const lineText = lineObj.text;
@@ -152,27 +165,33 @@ export const parseRecipeFromText = (input: string | any): ScannedRecipe => {
         // Skip garbage
         if (lineText.replace(/\s/g, '').length < 3) continue;
 
-        // Fix: Don't strip leading numbers blindly. Only strip if it looks like a list index (1. or 1))
-        // Strip bullets first
+        // Strip bullets first (for generic cleaning)
         let cleanLine = lineText.replace(/^[\s-*•·>]+/, '').trim();
+
+        // Detect if line starts with a number (for step splitting)
+        // We generally look at lineText for structure
+        const isNumberedLine = /^\d+[\.\)]\s/.test(cleanLine) || /^\d+[\.\)]\s/.test(lineText.trim());
+
         // Strip numbering like "1." or "1)"
         cleanLine = cleanLine.replace(/^\d+[\.\)]\s+/, '');
 
         // 1. Check for Explicit Section Headers
         if (isHeader(lineText, ingredientKeywords)) {
+            commitPendingStep();
             section = 'ingredients';
             continue;
         }
         if (isHeader(lineText, stepKeywords)) {
+            commitPendingStep();
             section = 'steps';
             continue;
         }
 
         // 2. Failsafe: Detect section switch
         if (section === 'ingredients') {
-            if (lineText.match(/^\d+[\.\)]\s+/) && lineText.length > 20) {
+            if (isNumberedLine && lineText.length > 20) {
+                commitPendingStep();
                 section = 'steps';
-                // Don't continue, simpler to let step logic handle it or just switch
             }
         }
 
@@ -195,14 +214,14 @@ export const parseRecipeFromText = (input: string | any): ScannedRecipe => {
             let boldDetected = false;
 
             if (lineObj.words && lineObj.words.length > 0) {
-                // Expanded bold check: check both 'is_bold' and 'bold' properties, sometimes confidence matters but keeping simple
                 const isBold = (w: any) => {
                     const fp = w.font_properties;
                     return fp && (fp.is_bold || fp.bold || (fp.font_weight && fp.font_weight > 600));
                 };
 
                 const boldWords = lineObj.words.filter((w: any) => isBold(w));
-                const regularWords = lineObj.words.filter((w: any) => !isBold(w));
+                // Filter regular words: exclude those that look like list bullets (e.g. "1.")
+                const regularWords = lineObj.words.filter((w: any) => !isBold(w) && !/^\d+[\.\)]$/.test(w.text));
 
                 // User logic: "Kalın olan name, kalın olmayan amount"
                 if (boldWords.length > 0 && regularWords.length > 0) {
@@ -212,33 +231,24 @@ export const parseRecipeFromText = (input: string | any): ScannedRecipe => {
                 }
             }
 
-            // Fallback to text analysis if bold detection didn't apply or wasn't conclusive
+            // Fallback to text analysis
             if (!boldDetected) {
                 const parts = cleanLine.split(' ');
-
-                // Enhanced Fallback Logic
-                // Known modifiers that should stick to "Amount" part
                 const modifiers = ['orta', 'boy', 'büyük', 'küçük', 'yarım', 'çeyrek', 'tam', 'bir', 'iki', 'üç', 'dört', 'beş', 'altı', 'yedi', 'sekiz', 'dokuz', 'on'];
                 const units = ['gr', 'g', 'kg', 'ml', 'cl', 'l', 'lt', 'kaşık', 'bardak', 'fincan', 'adet', 'tane', 'kase', 'tutam', 'demet', 'dilim', 'paket', 'çay', 'su', 'yemek', 'tatlı', 'kutu', 'kavanoz', 'diş'];
                 const prepMethods = ['rende', 'doğranmış', 'kıyılmış', 'ezilmiş', 'haşlanmış', 'rendelenmiş', 'soyulmuş', 'eritilmiş', 'kızarmış'];
 
-                // Strategy: Consume words from start as long as they match Number, Unit, Modifier, or Prep
                 let cutoffIndex = 0;
 
-                // Special start check: is first word number or prep?
                 if (parts.length > 0) {
                     const first = normalize(parts[0]);
-                    // Check if starts with digit OR is a prep method (e.g. "Rende Kaşar")
                     if (parts[0].match(/^\d/) || prepMethods.some(p => first.includes(p)) || modifiers.some(m => first === m)) {
                         cutoffIndex = 1;
-
-                        // Look ahead for more amount parts
                         for (let i = 1; i < parts.length; i++) {
                             const p = normalize(parts[i]);
                             if (units.some(u => p.includes(u)) || modifiers.some(m => p === m) || prepMethods.some(pm => p.includes(pm)) || parts[i].match(/^\d/)) {
                                 cutoffIndex = i + 1;
                             } else {
-                                // Stop at first unknown word (should be name)
                                 break;
                             }
                         }
@@ -249,7 +259,6 @@ export const parseRecipeFromText = (input: string | any): ScannedRecipe => {
                     amount = parts.slice(0, cutoffIndex).join(' ');
                     ingName = parts.slice(cutoffIndex).join(' ');
                 } else {
-                    // Default entire line to name if no structure found
                     amount = '';
                     ingName = cleanLine;
                 }
@@ -262,15 +271,15 @@ export const parseRecipeFromText = (input: string | any): ScannedRecipe => {
         } else if (section === 'steps') {
             // Subheader detection in steps
             if ((lineText.toLowerCase().includes('için') || lineText.endsWith(':')) && lineText.length < 40 && !lineText.match(/^\d/)) {
+                commitPendingStep();
                 currentStepGroupTitle = cleanLine.replace(/:$/, '');
                 continue;
             }
 
-            let description = lineText;
+            let description = cleanLine;
             let note = '';
 
-            // Extract Note in Parentheses
-            const parenMatch = lineText.match(/\((.*?)\)/);
+            const parenMatch = description.match(/\((.*?)\)/);
             if (parenMatch) {
                 note = parenMatch[1];
                 description = description.replace(parenMatch[0], '').replace(/\s{2,}/g, ' ').trim();
@@ -279,25 +288,39 @@ export const parseRecipeFromText = (input: string | any): ScannedRecipe => {
                 }
             }
 
-            description = description.replace(/^\d+[\.\-]\s*/, '').trim();
-
-            if (description) {
-                steps.push({
-                    description,
-                    title: currentStepGroupTitle || `Adım ${steps.length + 1}`
-                });
+            if (isNumberedLine) {
+                commitPendingStep();
+                pendingStep = {
+                    description: description,
+                    title: currentStepGroupTitle
+                };
+            } else {
+                if (pendingStep) {
+                    pendingStep.description += " " + description;
+                } else {
+                    // Implicit first step
+                    pendingStep = {
+                        description: description,
+                        title: currentStepGroupTitle
+                    };
+                }
             }
         } else {
             // Unknown section
             if (lineText.match(/^[-*•]/)) {
                 section = 'ingredients';
                 ingredients.push({ amount: '', name: cleanLine });
-            } else if (lineText.match(/^\d+[\.\)]/)) {
+            } else if (isNumberedLine) {
                 section = 'steps';
-                steps.push({ description: cleanLine.replace(/^\d+[\.\-]\s*/, ''), title: `Adım 1` });
+                pendingStep = {
+                    description: cleanLine,
+                    title: ''
+                };
             }
         }
     }
+
+    commitPendingStep();
 
     if (ingredients.length === 0 && steps.length === 0) {
         steps.push({ description: originalText, title: 'Tüm Tarif' });
