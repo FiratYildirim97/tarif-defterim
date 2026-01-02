@@ -252,8 +252,13 @@ const AddRecipeScreen: React.FC<AddRecipeScreenProps> = ({
 
     const recipeData = sanitizeRecipeData(rawRecipeData);
 
-    if (isEditMode && onUpdateRecipe) onUpdateRecipe(recipeData); else onAddRecipe(recipeData);
-    navigate(isEditMode ? `/recipe/${recipeData.id}` : '/home');
+    if (isEditMode && onUpdateRecipe) {
+      onUpdateRecipe(recipeData);
+      navigate(-1); // Go back to Detail screen correctly, preserving history stack order
+    } else {
+      onAddRecipe(recipeData);
+      navigate('/home', { replace: true });
+    }
   };
 
   return (
