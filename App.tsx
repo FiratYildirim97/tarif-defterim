@@ -8,7 +8,23 @@ import SettingsScreen from './screens/SettingsScreen';
 import { ThemeMode, Recipe, Category } from './types';
 import { INITIAL_RECIPES } from './constants';
 import { initializeApp, getApp, getApps } from 'firebase/app';
-import { getFirestore, collection, onSnapshot, doc, setDoc, writeBatch } from 'firebase/firestore';
+import { getFirestore, collection, onSnapshot, doc, setDoc, writeBatch, deleteDoc } from 'firebase/firestore';
+
+// ... (code omitted)
+
+<Route
+  path="/settings"
+  element={
+    <SettingsScreen
+      theme={theme}
+      setTheme={setTheme}
+      userName={userName}
+      setUserName={setUserName}
+      resetData={resetData}
+      recipes={recipes}
+    />
+  }
+/>
 
 // Hardcoded Firebase Configuration
 const firebaseConfig = {
@@ -165,6 +181,23 @@ const App: React.FC = () => {
     }
   };
 
+  const deleteRecipe = async (id: string) => {
+    if (!window.confirm('Bu tarifi silmek istediğinize emin misiniz?')) return;
+
+    // Optimistic
+    setRecipes(prev => prev.filter(r => r.id !== id));
+
+    // Remote
+    try {
+      const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+      const db = getFirestore(app);
+      await deleteDoc(doc(db, 'tarif_defterim', id));
+    } catch (err) {
+      console.error("Delete Recipe Error:", err);
+      alert("Silme işlemi kaydedilemedi.");
+    }
+  };
+
   const resetData = () => {
     if (window.confirm('Tüm verileri sıfırlamak istediğinize emin misiniz? Kendi eklediğiniz tarifler silinecektir.')) {
       setRecipes(INITIAL_RECIPES);
@@ -204,6 +237,7 @@ const App: React.FC = () => {
               <RecipeDetailScreen
                 recipes={recipes}
                 toggleFavorite={toggleFavorite}
+                deleteRecipe={deleteRecipe}
               />
             }
           />
