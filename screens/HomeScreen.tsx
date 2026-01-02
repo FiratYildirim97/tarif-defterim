@@ -12,9 +12,10 @@ interface HomeScreenProps {
   categories: string[];
   onAddCategory: (name: string) => void;
   userName?: string;
+  deleteRecipe?: (id: string) => void;
 }
 
-const HomeScreen: React.FC<HomeScreenProps> = ({ recipes, toggleFavorite, categories, onAddCategory, userName = 'Şef' }) => {
+const HomeScreen: React.FC<HomeScreenProps> = ({ recipes, toggleFavorite, categories, onAddCategory, userName = 'Şef', deleteRecipe }) => {
   const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState<string>(Category.ALL);
   const [searchQuery, setSearchQuery] = useState('');
@@ -151,15 +152,44 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ recipes, toggleFavorite, catego
                     src={recipe.image}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60"></div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleFavorite(recipe.id);
-                    }}
-                    className="absolute top-4 right-4 z-10 size-11 flex items-center justify-center rounded-2xl bg-white/20 backdrop-blur-md border border-white/30 text-white hover:bg-white transition-all hover:text-red-500"
-                  >
-                    <span className={`material-symbols-outlined ${recipe.isFavorite ? 'fill-current text-red-500' : ''}`} style={{ fontVariationSettings: recipe.isFavorite ? "'FILL' 1" : "'FILL' 0" }}>favorite</span>
-                  </button>
+
+                  {/* Card Actions Overlay */}
+                  <div className="absolute top-4 right-4 z-10 flex flex-col gap-2">
+                    {/* Favorite Button */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleFavorite(recipe.id);
+                      }}
+                      className="size-11 flex items-center justify-center rounded-2xl bg-white/20 backdrop-blur-md border border-white/30 text-white hover:bg-white transition-all hover:text-red-500"
+                    >
+                      <span className={`material-symbols-outlined ${recipe.isFavorite ? 'fill-current text-red-500' : ''}`} style={{ fontVariationSettings: recipe.isFavorite ? "'FILL' 1" : "'FILL' 0" }}>favorite</span>
+                    </button>
+
+                    {/* Edit Button */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/edit/${recipe.id}`);
+                      }}
+                      className="size-11 flex items-center justify-center rounded-2xl bg-white/20 backdrop-blur-md border border-white/30 text-white hover:bg-white transition-all hover:text-primary"
+                    >
+                      <span className="material-symbols-outlined">edit</span>
+                    </button>
+
+                    {/* Delete Button */}
+                    {deleteRecipe && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteRecipe(recipe.id);
+                        }}
+                        className="size-11 flex items-center justify-center rounded-2xl bg-red-500/20 backdrop-blur-md border border-red-500/30 text-white hover:bg-red-500 transition-all"
+                      >
+                        <span className="material-symbols-outlined">delete</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="p-6 flex flex-col flex-1">
